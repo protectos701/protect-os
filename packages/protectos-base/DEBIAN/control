@@ -4,8 +4,8 @@ Architecture: all
 Maintainer: @MAINTAINER@
 Section: misc
 Priority: optional
-Depends: base-files
-Recommends: xdg-user-dirs, ufw, unattended-upgrades, systemd-zram-generator
+Depends: base-files, python3, util-linux
+Recommends: efibootmgr, xdg-user-dirs, ufw, unattended-upgrades, systemd-zram-generator
 Description: Identité et réglages de base de protect.OS
  Donne au système le nom « protect.OS » (fichier os-release), règle le menu
  de démarrage GRUB et ajoute l'icône d'installation en session d'essai.

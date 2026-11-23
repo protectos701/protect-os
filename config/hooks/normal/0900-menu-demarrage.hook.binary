@@ -1,6 +1,21 @@
 #!/bin/sh
-# Remplace l'image Debian (casque jaune) du menu de démarrage de l'ISO par celle de protect.OS.
+# Menu de démarrage de l'ISO : image et textes protect.OS (plus de casque Debian ni de « Live system »).
 set -e
+for f in $(find . -path ./chroot -prune -o \( -name '*.cfg' -o -name 'theme.txt' \) -print 2>/dev/null); do
+	case "$f" in *boot/grub*|*isolinux*|*syslinux*) ;; *) continue ;; esac
+	sed -i \
+		-e 's/Live system (amd64 fail-safe mode)/protect.OS (mode sans échec)/g' \
+		-e 's/Live system (amd64)/Essayer ou installer protect.OS/g' \
+		-e 's/Live system/protect.OS/g' \
+		-e 's/Debian GNU\/Linux/protect.OS/g' -e 's/GNU\/Linux//g' -e 's/Debian/protect.OS/g' \
+		-e 's/Memory Diagnostic Test/Test de la mémoire/g' -e 's/Hardware Detection Tool (HDT)/Détection du matériel/g' \
+		-e 's/UEFI Firmware Settings/Réglages du PC (UEFI)/g' -e 's/Utilities/Outils/g' \
+		-e 's/Boot menu/protect.OS/g' -e 's/Advanced options/Options avancées/g' \
+		-e 's/fail-safe mode/mode sans échec/g' \
+		-e 's/GNU GRUB  version/protect.OS/g' \
+		"$f"
+	echo "Menu de démarrage : textes de $f"
+done
 python3 - <<'PY'
 import glob, os
 from PIL import Image, ImageDraw, ImageFont, ImageOps

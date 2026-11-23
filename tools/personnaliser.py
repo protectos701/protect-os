@@ -381,7 +381,7 @@ def appliquer_bureau(c):
     for p in (os.path.join(THEME, "etc", "xdg", "kdeglobals"),
               os.path.join(THEME, "usr", "share", "plasma", "look-and-feel", "org.protectos.desktop", "contents", "defaults")):
         _remplacer(p, r"ColorScheme=ProtectBleuOr(Clair)?\b", "ColorScheme=ProtectBleuOr" + ("Clair" if clair else ""))
-        _remplacer(p, r"(\[Icons\]\nTheme=)breeze(-dark)?\b", r"\g<1>breeze" + ("" if clair else "-dark"))
+        _remplacer(p, r"(\[Icons\]\nTheme=)ProtectOS(-Clair)?\b", r"\g<1>ProtectOS" + ("-Clair" if clair else ""))
     js = os.path.join(THEME, "usr", "share", "plasma", "look-and-feel", "org.protectos.desktop", "contents",
                       "layouts", "org.kde.plasma.desktop-layout.js")
     spacer = 'panel.addWidget("org.kde.plasma.panelspacer"); // barre-centree'
@@ -403,29 +403,19 @@ def appliquer_bureau(c):
 
 
 def appliquer_noms_raccourcis(c):
-    # Noms des applications : un script exécuté pendant la construction de l'ISO
-    hook = os.path.join(ROOT, "config", "hooks", "normal", "0700-noms-applications.hook.chroot")
-    lignes = ["#!/bin/sh",
-              "# Créé par tools/personnaliser.py à partir de ma-personnalisation.conf — ne pas modifier.",
-              "# Donne à chaque application le nom choisi, sans toucher au logiciel lui-même :",
-              "# une copie renommée de son raccourci est placée dans /usr/local/share/applications.",
-              "set -e",
-              "renommer() {",
-              '\tsrc="/usr/share/applications/$1"',
-              '\t[ -f "$src" ] || { echo "protect.OS : $1 absent, nom inchangé"; return 0; }',
-              "\tmkdir -p /usr/local/share/applications",
-              "\tawk -v nom=\"$2\" '",
-              "\t\t/^\\[/ { section = $0 }",
-              '\t\tsection == "[Desktop Entry]" && /^Name(\\[[^]]*\\])?=/ { if (!fait) { print "Name=" nom; fait = 1 }; next }',
-              "\t\t{ print }",
-              "\t' \"$src\" > \"/usr/local/share/applications/$1\"",
-              "}"]
+    # Noms des applications : lus par protectos-identite sur le système (et réappliqués après chaque mise à jour)
+    conf = os.path.join(ROOT, "packages", "protectos-base", "root", "etc", "protectos", "noms-applications.conf")
+    os.makedirs(os.path.dirname(conf), exist_ok=True)
+    lignes = ["# Créé par tools/personnaliser.py à partir de ma-personnalisation.conf — ne pas modifier ici.",
+              "# Nom affiché de chaque application (raccourci = nom)."]
     for k, desktop in NOMS_APPS.items():
         if c["noms"][k]:
-            lignes.append(f'renommer {desktop} "{c["noms"][k]}"')
-    with open(hook, "w", encoding="utf-8") as f:
+            lignes.append(f"{desktop}={c['noms'][k]}")
+    with open(conf, "w", encoding="utf-8") as f:
         f.write("\n".join(lignes) + "\n")
-    os.chmod(hook, 0o755)
+    ancien = os.path.join(ROOT, "config", "hooks", "normal", "0700-noms-applications.hook.chroot")
+    if os.path.exists(ancien):
+        os.remove(ancien)
 
     # Raccourcis clavier : réglages par défaut de KDE pour tous les comptes
     out = ["# Créé par tools/personnaliser.py à partir de ma-personnalisation.conf — ne pas modifier.",

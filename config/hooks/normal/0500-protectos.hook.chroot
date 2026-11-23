@@ -28,4 +28,20 @@ if [ -x /usr/lib/protectos/protectos-bloqueur ]; then
 		|| echo "protect.OS : AVERTISSEMENT, la liste sera téléchargée au premier démarrage"
 fi
 
+echo "protect.OS : retrait des programmes qui affichent KDE ou Debian"
+# Chaque programme n'est retiré que si rien d'autre n'en a besoin (simulation d'abord).
+for p in plasma-welcome kdeconnect khelpcenter konqueror kwalletmanager xterm kuserfeedback-console \
+		debian-reference-common debian-faq imagemagick-7.q16 imagemagick-6.q16 kwrite; do
+	dpkg -s "$p" >/dev/null 2>&1 || continue
+	retires=$(apt-get -s purge "$p" | awk '/^Purg /{print $2}' | tr '\n' ' ')
+	if [ "$retires" = "$p " ]; then
+		apt-get purge -y "$p" >/dev/null && echo "  retiré : $p"
+	else
+		echo "  gardé (caché) : $p — d'autres éléments en dépendent ($retires)"
+	fi
+done
+
+echo "protect.OS : identité appliquée à tous les logiciels installés"
+/usr/lib/protectos/protectos-identite tout || true
+
 echo "protect.OS : réglages de l'image d'essai terminés"

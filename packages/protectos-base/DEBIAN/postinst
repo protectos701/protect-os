@@ -24,6 +24,10 @@ activer_pare_feu() {
 case "$1" in
 	configure)
 		activer_pare_feu
+		/usr/lib/protectos/protectos-identite tout || true
+		if command -v deb-systemd-helper >/dev/null 2>&1; then
+			deb-systemd-helper enable protectos-identite.service >/dev/null || true
+		fi
 		# Applique les réglages GRUB sur un système installé (pas pendant la construction de l'ISO)
 		if command -v update-grub >/dev/null 2>&1 && [ -f /boot/grub/grub.cfg ]; then
 			update-grub || true
@@ -31,6 +35,8 @@ case "$1" in
 		;;
 	triggered)
 		activer_pare_feu
+		/usr/lib/protectos/protectos-identite applications || true
+		/usr/lib/protectos/protectos-identite sessions || true
 		;;
 esac
 exit 0

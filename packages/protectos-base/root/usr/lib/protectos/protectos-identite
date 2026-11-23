@@ -1,0 +1,247 @@
+#!/usr/bin/python3
+"""Efface toute trace visible de Linux, Debian et KDE dans protect.OS.
+
+Relancé automatiquement après chaque installation ou mise à jour de logiciel
+(déclencheurs dpkg) et à chaque démarrage, pour que rien ne réapparaisse.
+
+  protectos-identite             tout appliquer
+  protectos-identite grub        nettoyer seulement le menu de démarrage
+  protectos-identite uefi        renommer l'entrée de démarrage du PC (« debian » → « protect.OS »)
+"""
+import glob
+import os
+import re
+import subprocess
+import sys
+
+NOM = "protect.OS"
+SRC = os.environ.get("PROTECTOS_APPS", "/usr/share/applications")
+LOCAL = os.environ.get("PROTECTOS_APPS_LOCAL", "/usr/local/share/applications")
+MARQUE = "X-ProtectOS-Identite=true"
+
+# Programmes techniques : ils restent installés (le système en a besoin) mais n'apparaissent nulle part.
+CACHER = [
+    "org.kde.kinfocenter.desktop", "kcm_about-distro.desktop", "org.kde.khelpcenter.desktop",
+    "org.kde.kmenuedit.desktop", "org.kde.kwalletmanager.desktop", "org.kde.kwalletmanager5.desktop",
+    "org.kde.plasma-welcome.desktop", "org.kde.kdeconnect.app.desktop", "org.kde.kdeconnect-settings.desktop",
+    "org.kde.kdeconnect.sms.desktop", "org.kde.kdeconnect.nonplasma.desktop", "org.kde.konqueror.desktop",
+    "kfmclient_html.desktop", "kfmclient_dir.desktop", "kfmclient.desktop", "kfmclient_war.desktop",
+    "org.kde.kuserfeedback-console.desktop", "org.kde.drkonqi.desktop", "org.kde.drkonqi.coredump.gui.desktop",
+    "org.kde.plasma.emojier.desktop", "org.kde.kded6.desktop", "org.kde.klipper.desktop", "org.kde.kdesu.desktop",
+    "org.kde.ksshaskpass.desktop", "org.kde.plasmaengineexplorer.desktop", "org.kde.plasmawindowed.desktop",
+    "org.kde.plasma.themeexplorer.desktop", "org.kde.kwrite.desktop", "org.kde.kfind.desktop",
+    "xterm.desktop", "uxterm.desktop", "debian-xterm.desktop", "debian-uxterm.desktop", "display-im6.q16.desktop",
+    "display-im7.q16.desktop", "htop.desktop", "vim.desktop", "gvim.desktop", "nvim.desktop", "btop.desktop",
+    "wine.desktop", "wine-notepad.desktop", "wine-winecfg.desktop", "wine-uninstaller.desktop",
+    "wine-winefile.desktop", "wine-wineboot.desktop", "wine-regedit.desktop", "winetricks.desktop",
+    "wine-browsedrive.desktop", "wine-oleview.desktop", "wine-mime-msi.desktop", "wine-mime-exe.desktop",
+    "ibus-setup.desktop", "org.freedesktop.IBus.Setup.desktop", "im-config.desktop", "debian-reference.desktop",
+    "designer.desktop", "linguist.desktop", "assistant.desktop", "org.qt.designer.desktop",
+    "org.qt.linguist.desktop", "org.qt.assistant.desktop", "qv4l2.desktop", "qvidcap.desktop",
+    "bssh.desktop", "bvnc.desktop", "avahi-discover.desktop", "org.kde.kgpg.desktop", "kdesystemsettings.desktop",
+    "nm-connection-editor.desktop", "system-config-printer.desktop", "hplip.desktop", "hp-uiscan.desktop",
+    "yelp.desktop", "org.gnome.Yelp.desktop", "lstopo.desktop", "cups.desktop", "python3.13.desktop",
+    "org.kde.kwalletd6.desktop", "org.kde.plasma.settings.open.desktop",
+]
+
+# Noms neutres pour les logiciels qui portent un nom KDE/Linux (en plus de ceux choisis dans
+# /etc/protectos/noms-applications.conf, qui passent en priorité).
+NOMS = {
+    "org.kde.dolphin.desktop": "Explorateur de fichiers", "org.kde.konsole.desktop": "Terminal",
+    "org.kde.spectacle.desktop": "Capture d'écran", "org.kde.plasma-systemmonitor.desktop": "Gestionnaire des tâches",
+    "org.kde.okular.desktop": "Lecteur PDF", "org.kde.gwenview.desktop": "Photos", "org.kde.kate.desktop": "Bloc-notes",
+    "org.kde.kcalc.desktop": "Calculatrice", "org.kde.discover.desktop": "Magasin d'applications",
+    "systemsettings.desktop": "Paramètres", "org.kde.ark.desktop": "Archives",
+    "org.kde.partitionmanager.desktop": "Gestionnaire de disques", "firefox-esr.desktop": "Navigateur Internet",
+    "firefox.desktop": "Navigateur Internet", "vlc.desktop": "Lecteur multimédia",
+    "org.kde.skanlite.desktop": "Numériseur", "timeshift-gtk.desktop": "Sauvegardes du système",
+    "org.kde.plasma.firewall.desktop": "Pare-feu", "libreoffice-writer.desktop": "Traitement de texte",
+    "libreoffice-calc.desktop": "Tableur", "libreoffice-impress.desktop": "Présentations",
+    "libreoffice-startcenter.desktop": "Suite bureautique", "org.kde.kwalletmanager5.desktop": "Mots de passe",
+    "org.kde.print-manager.desktop": "Imprimantes", "org.kde.filelight.desktop": "Espace disque",
+    "org.kde.elisa.desktop": "Musique", "org.kde.haruna.desktop": "Vidéos", "org.kde.kcharselect.desktop": "Caractères spéciaux",
+}
+
+# Mots à faire disparaître des descriptions (Comment, GenericName, Keywords)
+MOTS = re.compile(r"\b(KDE|Plasma|Debian|GNU/Linux|Linux|Wine|Konqueror|Dolphin|Konsole|Okular|Gwenview|Kate|"
+                  r"Discover|Spectacle|Ark|KCalc)\b ?", re.I)
+
+SESSIONS = {"plasma.desktop": NOM, "plasmawayland.desktop": NOM, "plasmax11.desktop": f"{NOM} (compatibilité)"}
+
+
+def lire_noms_choisis():
+    noms = {}
+    try:
+        for ligne in open("/etc/protectos/noms-applications.conf", encoding="utf-8"):
+            ligne = ligne.strip()
+            if ligne and not ligne.startswith("#") and "=" in ligne:
+                k, v = ligne.split("=", 1)
+                if v.strip():
+                    noms[k.strip()] = v.strip()
+    except OSError:
+        pass
+    return noms
+
+
+def reecrire(src, nom=None, cacher=False):
+    """Copie le raccourci dans /usr/local (prioritaire) avec un nom neutre ou caché."""
+    out, section = [], None
+    for ligne in open(src, encoding="utf-8", errors="replace").read().splitlines():
+        if ligne.startswith("["):
+            section = ligne
+            out.append(ligne)
+            if ligne == "[Desktop Entry]":
+                if nom:
+                    out.append(f"Name={nom}")
+                if cacher:
+                    out.append("NoDisplay=true")
+                out.append(MARQUE)
+            continue
+        if section == "[Desktop Entry]":
+            cle = ligne.split("=", 1)[0].split("[", 1)[0]
+            if nom and cle in ("Name", "X-GNOME-FullName"):
+                continue
+            if cacher and cle == "NoDisplay":
+                continue
+            if cle in ("GenericName", "Comment") and MOTS.search(ligne.split("=", 1)[-1]):
+                continue  # une description qui cite KDE/Linux disparaît (le nom suffit)
+            if cle in ("Keywords", "Name") and "=" in ligne:
+                k, v = ligne.split("=", 1)
+                v = re.sub(r" {2,}", " ", MOTS.sub("", v)).strip(" ,;-")
+                if not v:
+                    continue
+                ligne = f"{k}={v}"
+        elif section and section.startswith("[Desktop Action") and nom:
+            ligne = MOTS.sub("", ligne) if ligne.startswith("Name") else ligne
+        out.append(ligne)
+    dst = os.path.join(LOCAL, os.path.basename(src))
+    os.makedirs(LOCAL, exist_ok=True)
+    with open(dst, "w", encoding="utf-8") as f:
+        f.write("\n".join(out) + "\n")
+
+
+def applications():
+    noms = {**NOMS, **lire_noms_choisis()}
+    faits = set()
+    for src in sorted(glob.glob(os.path.join(SRC, "*.desktop"))):
+        base = os.path.basename(src)
+        dst = os.path.join(LOCAL, base)
+        if os.path.exists(dst) and MARQUE not in open(dst, encoding="utf-8", errors="replace").read():
+            continue  # raccourci personnalisé par l'administrateur : on n'y touche pas
+        if base in CACHER:
+            reecrire(src, cacher=True)
+        elif base in noms:
+            reecrire(src, nom=noms[base])
+        elif MOTS.search(open(src, encoding="utf-8", errors="replace").read()):
+            reecrire(src)
+        else:
+            continue
+        faits.add(base)
+    # Retire nos copies dont l'original a été désinstallé
+    for dst in glob.glob(os.path.join(LOCAL, "*.desktop")):
+        base = os.path.basename(dst)
+        if base not in faits and not os.path.exists(os.path.join(SRC, base)):
+            if MARQUE in open(dst, encoding="utf-8", errors="replace").read():
+                os.remove(dst)
+    if os.path.exists("/usr/bin/update-desktop-database"):
+        subprocess.run(["update-desktop-database", "-q", LOCAL], capture_output=True)
+
+
+def sessions():
+    """Le choix de session sur l'écran de connexion affiche « protect.OS » au lieu de « Plasma »."""
+    for d in ("/usr/share/wayland-sessions", "/usr/share/xsessions"):
+        for f in glob.glob(os.path.join(d, "*.desktop")):
+            nom = SESSIONS.get(os.path.basename(f))
+            if not nom:
+                continue
+            lignes = open(f, encoding="utf-8").read().splitlines()
+            neuf = []
+            for ligne in lignes:
+                cle = ligne.split("=", 1)[0].split("[", 1)[0]
+                if cle in ("Name", "Comment"):
+                    continue
+                neuf.append(ligne)
+                if ligne == "[Desktop Entry]":
+                    neuf += [f"Name={nom}", f"Comment={NOM}"]
+            if neuf != lignes:
+                with open(f, "w", encoding="utf-8") as fh:
+                    fh.write("\n".join(neuf) + "\n")
+
+
+def grub(cfg="/boot/grub/grub.cfg"):
+    """Menu de démarrage : « protect.OS » partout, sans « GNU/Linux », « Linux 6.x » ni « Loading Linux… »."""
+    if not os.path.exists(cfg):
+        return
+    texte = open(cfg, encoding="utf-8", errors="replace").read()
+    neuf = []
+    for ligne in texte.splitlines():
+        s = ligne.strip()
+        if s.startswith("echo") and re.search(r"Loading (Linux|initial ramdisk)|Chargement de Linux|"
+                                              r"Chargement du disque", s):
+            continue
+        if s.startswith(("menuentry ", "submenu ")):
+            ligne = (ligne.replace(" GNU/Linux", "").replace("Debian", NOM)
+                     .replace("Advanced options for", "Options avancées de")
+                     .replace("Options avancées pour", "Options avancées de")
+                     .replace("(recovery mode)", "(mode de secours)").replace("(mode de dépannage)", "(mode de secours)"))
+            ligne = re.sub(r", (with|avec) Linux ([^'\"]+)", r", version \2", ligne)
+            ligne = ligne.replace("UEFI Firmware Settings", "Réglages du PC (UEFI)")
+        neuf.append(ligne)
+    sortie = "\n".join(neuf) + "\n"
+    if sortie != texte:
+        tmp = cfg + ".protectos"
+        with open(tmp, "w", encoding="utf-8") as f:
+            f.write(sortie)
+        os.chmod(tmp, os.stat(cfg).st_mode & 0o777)
+        os.replace(tmp, cfg)
+
+
+def uefi():
+    """Le menu de démarrage du PC (touche F12/F8…) affiche « protect.OS » au lieu de « debian »."""
+    if not os.path.isdir("/sys/firmware/efi") or not os.path.exists("/usr/bin/efibootmgr"):
+        return
+    r = subprocess.run(["efibootmgr"], capture_output=True, text=True)
+    if r.returncode:
+        return
+    entrees = [(n, l, c) for n, l, c in re.findall(r"^Boot([0-9A-F]{4})\*? ([^\t\n]+)\t?(.*)$", r.stdout, re.M)]
+    debian = [(n, chemin) for n, label, chemin in entrees if label.strip().lower() == "debian"]
+    deja = any(label.strip() == NOM for _n, label, _c in entrees)
+    if not debian:
+        return
+    if not deja:
+        loader = "\\EFI\\debian\\shimx64.efi" if os.path.exists("/boot/efi/EFI/debian/shimx64.efi") \
+            else "\\EFI\\debian\\grubx64.efi"
+        src = subprocess.run(["findmnt", "-no", "SOURCE", "/boot/efi"], capture_output=True, text=True).stdout.strip()
+        if not src.startswith("/dev/"):
+            return
+        part = os.path.basename(os.path.realpath(src))
+        try:
+            numero = open(f"/sys/class/block/{part}/partition").read().strip()
+        except OSError:
+            return
+        disque = subprocess.run(["lsblk", "-no", "PKNAME", src], capture_output=True, text=True).stdout.strip()
+        if not disque:
+            return
+        c = subprocess.run(["efibootmgr", "-q", "-c", "-d", f"/dev/{disque}", "-p", numero, "-L", NOM,
+                            "-l", loader], capture_output=True, text=True)
+        if c.returncode:
+            return  # on garde l'entrée d'origine : le PC doit toujours pouvoir démarrer
+    for n, _c in debian:
+        subprocess.run(["efibootmgr", "-q", "-b", n, "-B"], capture_output=True)
+
+
+def main():
+    cmd = sys.argv[1] if len(sys.argv) > 1 else "tout"
+    if cmd in ("tout", "applications"):
+        applications()
+    if cmd in ("tout", "sessions"):
+        sessions()
+    if cmd in ("tout", "grub"):
+        grub()
+    if cmd == "uefi":
+        uefi()
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

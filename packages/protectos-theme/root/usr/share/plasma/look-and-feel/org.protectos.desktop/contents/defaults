@@ -6,7 +6,7 @@ ColorScheme=ProtectBleuOr
 AccentColor=212,167,44
 
 [kdeglobals][Icons]
-Theme=breeze-dark
+Theme=ProtectOS
 
 [plasmarc][Theme]
 name=default

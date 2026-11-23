@@ -1,0 +1,6 @@
+#!/bin/sh
+# protect.OS : met à jour le menu de démarrage, puis en retire les mentions « Linux » et « Debian ».
+set -e
+[ -x /usr/sbin/update-grub.debian ] || exit 0
+/usr/sbin/update-grub.debian "$@"
+/usr/lib/protectos/protectos-identite grub || true

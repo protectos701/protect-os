@@ -1,2 +1,6 @@
 # Réagir quand le pare-feu ufw est installé, pour l'activer une première fois
 interest-noawait /etc/ufw/ufw.conf
+# Réappliquer l'identité protect.OS quand un logiciel ajoute un raccourci ou une session
+interest-noawait /usr/share/applications
+interest-noawait /usr/share/wayland-sessions
+interest-noawait /usr/share/xsessions

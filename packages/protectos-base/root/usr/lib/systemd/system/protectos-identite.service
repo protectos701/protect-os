@@ -1,0 +1,12 @@
+[Unit]
+Description=protect.OS : identité du système
+After=local-fs.target boot-efi.mount
+ConditionPathExists=!/run/live/medium
+
+[Service]
+Type=oneshot
+ExecStart=/usr/lib/protectos/protectos-identite tout
+ExecStart=/usr/lib/protectos/protectos-identite uefi
+
+[Install]
+WantedBy=multi-user.target

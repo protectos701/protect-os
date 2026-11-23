@@ -2,7 +2,8 @@
 set -e
 # Remplace l'identité Debian par celle de protect.OS, en gardant l'original de côté.
 if [ "$1" = "install" ] || [ "$1" = "upgrade" ]; then
-	dpkg-divert --package protectos-base --add --rename \
-		--divert /usr/lib/os-release.debian /usr/lib/os-release
+	for f in /usr/lib/os-release /etc/issue /etc/issue.net /usr/sbin/update-grub; do
+		dpkg-divert --package protectos-base --add --rename --divert "$f.debian" "$f"
+	done
 fi
 exit 0

@@ -7,4 +7,20 @@ LookAndFeelPackage=org.protectos.desktop
 widgetStyle=Breeze
 
 [Icons]
-Theme=breeze-dark
+Theme=ProtectOS
+
+# protect.OS : aucune fenêtre « À propos de KDE », signalement de bogue KDE ou dons KDE dans les menus d'aide
+[KDE Action Restrictions][$i]
+action/help_about_kde=false
+action/help_about_app=false
+action/help_report_bug=false
+action/help_donate=false
+action/help_contents=false
+action/switch_application_language=false
+
+# Pages techniques retirées des Paramètres (remplacées par « À propos de protect.OS »)
+[KDE Control Module Restrictions][$i]
+kcm_about-distro=false
+kcm_kdeconnect=false
+kcm_feedback=false
+kcm_plasmasearch=true

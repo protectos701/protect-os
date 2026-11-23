@@ -1,7 +1,7 @@
 PRETTY_NAME="protect.OS @VERSION@"
 NAME="protect.OS"
 VERSION_ID="@VERSION@"
-VERSION="@VERSION@ (base Debian 13 trixie)"
+VERSION="@VERSION@"
 VERSION_CODENAME=trixie
 ID=protectos
 ID_LIKE=debian

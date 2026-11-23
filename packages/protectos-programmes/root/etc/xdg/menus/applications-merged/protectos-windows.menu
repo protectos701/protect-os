@@ -1,0 +1,14 @@
+<!DOCTYPE Menu PUBLIC "-//freedesktop//DTD Menu 1.0//EN"
+ "http://www.freedesktop.org/standards/menu-spec/1.0/menu.dtd">
+<!-- protect.OS : rubrique « Programmes Windows » du menu Démarrer -->
+<Menu>
+  <Name>Applications</Name>
+  <Menu>
+    <Name>protectos-windows</Name>
+    <Directory>protectos-windows.directory</Directory>
+    <Include>
+      <Category>X-ProtectOS-Windows</Category>
+      <Category>Wine</Category>
+    </Include>
+  </Menu>
+</Menu>

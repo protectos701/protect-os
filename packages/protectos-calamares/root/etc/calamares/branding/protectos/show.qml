@@ -54,7 +54,7 @@ Presentation {
 
     ProtectSlide {
         titre: "Bienvenue dans protect.OS"
-        texte: "Un système libre et rapide, en bleu et or, construit sur Debian 13 et KDE Plasma 6."
+        texte: "Un système rapide et protégé, en bleu et or, pensé pour vous."
     }
     ProtectSlide {
         titre: "Tout est prêt dès le départ"
@@ -62,11 +62,11 @@ Presentation {
     }
     ProtectSlide {
         titre: "Des milliers d'applications"
-        texte: "Ouvrez Discover, le magasin d'applications, pour installer jeux, logiciels créatifs et outils."
+        texte: "Ouvrez le Magasin d'applications pour installer jeux, logiciels créatifs et outils."
     }
     ProtectSlide {
         titre: "Toujours à jour"
-        texte: "Les mises à jour de sécurité de Debian arrivent automatiquement dans Discover."
+        texte: "Les mises à jour de sécurité s'installent toutes seules, chaque jour."
     }
 
     function onActivate() { presentation.currentSlide = 0; }

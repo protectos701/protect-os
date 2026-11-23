@@ -10,6 +10,21 @@ for f in /usr/share/applications/install-debian.desktop /usr/share/applications/
 	fi
 done
 
+# L'installateur Debian pose aussi une icône « Install Debian » sur le bureau au démarrage : on la retire
+for f in /etc/xdg/autostart/calamares-desktop-icon.desktop /etc/xdg/autostart/install-debian.desktop \
+		/etc/skel/Desktop/install-debian.desktop /etc/skel/Desktop/calamares.desktop; do
+	[ -e "$f" ] && rm -f "$f" && echo "  retiré : $f"
+done
+grep -rl "install-debian" /etc/xdg/autostart 2>/dev/null | while read -r f; do rm -f "$f"; echo "  retiré : $f"; done
+
+echo "protect.OS : nom du système"
+ls -l /etc/os-release /usr/lib/os-release || true
+if [ ! -L /etc/os-release ] || [ "$(readlink -f /etc/os-release)" != "/usr/lib/os-release" ]; then
+	ln -sf ../usr/lib/os-release /etc/os-release
+	echo "  /etc/os-release relié à l'identité protect.OS"
+fi
+grep PRETTY_NAME /etc/os-release
+
 echo "protect.OS : compatibilité Windows 32 bits (wine32:i386)"
 # Dans Debian 13, Wine a besoin de sa partie 32 bits pour les programmes Windows 32 bits.
 dpkg --add-architecture i386

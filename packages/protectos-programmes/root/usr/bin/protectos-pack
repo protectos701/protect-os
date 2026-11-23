@@ -405,7 +405,7 @@ def cmd_build(src, outdir):
                            capture_output=True, text=True)
         if r.returncode:
             die("dpkg-deb a échoué :\n" + r.stderr)
-    kind = "programme Windows" if windows else "programme Linux"
+    kind = "programme Windows" if windows else "programme protect.OS"
     print(f"Paquet créé : {out}  ({kind}, {os.path.getsize(out) // 1024} Ko)")
     print("Double-cliquez dessus pour l'installer, ou : sudo apt install ./" + os.path.relpath(out))
     return out

@@ -230,8 +230,24 @@ def uefi():
         subprocess.run(["efibootmgr", "-q", "-b", n, "-B"], capture_output=True)
 
 
+def nom_systeme():
+    """/etc/os-release doit toujours désigner l'identité protect.OS."""
+    try:
+        if os.path.exists("/usr/lib/os-release") and "protect" in open("/usr/lib/os-release").read() and \
+                os.path.realpath("/etc/os-release") != "/usr/lib/os-release":
+            tmp = "/etc/.os-release.protectos"
+            if os.path.lexists(tmp):
+                os.remove(tmp)
+            os.symlink("../usr/lib/os-release", tmp)
+            os.replace(tmp, "/etc/os-release")
+    except OSError:
+        pass
+
+
 def main():
     cmd = sys.argv[1] if len(sys.argv) > 1 else "tout"
+    if cmd == "tout":
+        nom_systeme()
     if cmd in ("tout", "applications"):
         applications()
     if cmd in ("tout", "sessions"):

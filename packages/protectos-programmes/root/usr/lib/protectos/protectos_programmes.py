@@ -382,17 +382,17 @@ def add_portable(exe, nom, editeur="", version=""):
     if os.path.abspath(exe) != os.path.abspath(target):
         shutil.copy2(exe, target)
     icon = os.path.join(ICONS_DIR, f"protectos-win-{pid}.png")
-    icon_name = f"protectos-win-{pid}" if extract_icon(target, icon) else "wine"
+    icon_name = f"protectos-win-{pid}" if extract_icon(target, icon) else "application-x-ms-dos-executable"
     desktop = os.path.join(APPS_DIR, f"protectos-win-{pid}.desktop")
     os.makedirs(APPS_DIR, exist_ok=True)
     with open(desktop, "w", encoding="utf-8") as f:
         f.write("[Desktop Entry]\nType=Application\n"
                 f"Name={nom}\nComment=Programme Windows\n"
                 f"Exec=env WINEDEBUG=-all wine \"{target}\"\n"
-                f"Path={folder}\nIcon={icon_name}\nCategories=Wine;\n")
+                f"Path={folder}\nIcon={icon_name}\nCategories=X-ProtectOS-Windows;\n")
     os.chmod(desktop, 0o755)
     entry = {"type": "portable", "id": pid, "nom": nom, "editeur": editeur, "version": version,
-             "dossier": folder, "desktop": desktop, "icone": icon if icon_name != "wine" else "",
+             "dossier": folder, "desktop": desktop, "icone": icon if icon_name.startswith("protectos-win-") else "",
              "ajoute": time.strftime("%Y-%m-%d")}
     items.append(entry)
     _save_portables(items)
@@ -444,8 +444,44 @@ def all_programs():
     return windows_programs() + load_portables() + protectos_apps()
 
 
+WINE_RUBRIQUES = {"Wine": "Programmes Windows", "Programs": "Programmes", "Accessories": "Accessoires",
+                  "Startup": "Démarrage", "Games": "Jeux", "Administrative Tools": "Outils d'administration"}
+
+
+def renommer_rubriques_windows():
+    """Les rubriques créées par les installateurs Windows s'appellent « Programmes Windows », pas « Wine »."""
+    dossier = os.path.expanduser("~/.local/share/desktop-directories")
+    if not os.path.isdir(dossier):
+        return
+    for f in os.listdir(dossier):
+        if not (f.startswith("wine-") and f.endswith(".directory")):
+            continue
+        chemin = os.path.join(dossier, f)
+        try:
+            lignes = open(chemin, encoding="utf-8", errors="replace").read().splitlines()
+        except OSError:
+            continue
+        neuf = []
+        for ligne in lignes:
+            if ligne.startswith("Name[") or ligne.startswith("Comment"):
+                continue
+            if ligne.startswith("Name="):
+                nom = ligne[5:].strip()
+                ligne = "Name=" + WINE_RUBRIQUES.get(nom, nom)
+            if ligne.startswith("Icon=") and "wine" in ligne.lower():
+                ligne = "Icon=protectos-logo"
+            neuf.append(ligne)
+        if neuf != lignes:
+            with open(chemin, "w", encoding="utf-8") as fh:
+                fh.write("\n".join(neuf) + "\n")
+
+
 def refresh_menu():
     """Demande à Plasma de relire les raccourcis du menu Démarrer."""
+    try:
+        renommer_rubriques_windows()
+    except Exception:
+        pass
     for tool in ("kbuildsycoca6", "kbuildsycoca5"):
         if shutil.which(tool):
             subprocess.Popen([tool], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)

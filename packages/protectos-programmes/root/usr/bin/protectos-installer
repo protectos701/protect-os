@@ -55,7 +55,7 @@ class Installer(QDialog):
         title.setFont(f)
         title.setWordWrap(True)
         details = []
-        details.append("Paquet Linux (.deb)" if self.kind == "deb" else
+        details.append("Paquet protect.OS (.deb)" if self.kind == "deb" else
                        "Installateur Windows (.msi)" if self.kind == "msi" else "Programme Windows")
         if self.info.get("editeur"):
             details.append("Éditeur : " + self.info["editeur"])
@@ -295,7 +295,7 @@ class Installer(QDialog):
             names = ", ".join(f"« {p['nom']} »" for p in new)
             self.result.setText(f"<b>Installation terminée.</b><br><br>{names} "
                                 f"{'est installé' if len(new) == 1 else 'sont installés'}. "
-                                "Vous le retrouverez dans le menu Démarrer, rubrique « Wine », et dans "
+                                "Vous le retrouverez dans le menu Démarrer, rubrique « Programmes Windows », et dans "
                                 "« Programmes et fonctionnalités » pour le désinstaller.")
         else:
             self.result.setText("<b>Aucun nouveau programme n'a été enregistré.</b><br><br>"

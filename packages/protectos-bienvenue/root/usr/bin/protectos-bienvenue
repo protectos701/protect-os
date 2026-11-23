@@ -213,7 +213,7 @@ class Bienvenue(QWidget):
 
     # ------------------------------------------------------------ pages
     def page_accueil(self):
-        items = [para("protect.OS est un système libre, rapide et sûr, construit sur Debian. "
+        items = [para("protect.OS est un système rapide, sûr et protégé. "
                       "Cet assistant vous aide à le régler à votre goût en quelques minutes.")]
         if vb.is_live():
             b = QPushButton(QIcon.fromTheme("protectos-logo"), "Installer protect.OS sur cet ordinateur")
@@ -227,7 +227,7 @@ class Bienvenue(QWidget):
         tips = [
             ("Menu Démarrer", "Le logo protect.OS en bas de l'écran ouvre le menu : tapez simplement le nom "
                               "d'une application pour la trouver."),
-            ("Discover", "Le magasin d'applications : des milliers de logiciels gratuits et les mises à jour."),
+            ("Magasin d'applications", "Des milliers de logiciels gratuits et les mises à jour."),
             ("Programmes Windows", "Double-cliquez sur un fichier .exe pour l'installer, comme sous Windows."),
         ]
         for name, text in tips:
@@ -347,7 +347,7 @@ class Bienvenue(QWidget):
 
         btn.clicked.connect(install)
 
-        # Flathub : des milliers d'applications de plus dans Discover
+        # Flathub : des milliers d'applications de plus dans le Magasin d'applications
         fh_status = QLabel("")
         fh_status.setWordWrap(True)
         fh_btn = QPushButton(QIcon.fromTheme("flatpak-discover", QIcon.fromTheme("plasmadiscover")),
@@ -355,16 +355,16 @@ class Bienvenue(QWidget):
         fh_task = Task(self, fh_btn, fh_status)
         fh_btn.clicked.connect(lambda: fh_task.run(
             ["flathub"], "Activation de Flathub…",
-            "Flathub est activé : ses applications apparaissent dans Discover."))
+            "Flathub est activé : ses applications apparaissent dans le Magasin d'applications."))
         fh_row = QHBoxLayout()
         fh_row.addWidget(fh_btn)
         fh_row.addStretch(1)
         flathub = card(para("<b>Encore plus d'applications avec Flathub</b> — Spotify, Discord, Zoom, "
-                            "Signal, VS Code… s'installent depuis Discover, à jour et isolées du système."),
+                            "Signal, VS Code… s'installent depuis le Magasin d'applications, à jour et isolées du système."),
                        fh_row, fh_task.bar, fh_status)
         flathub.setVisible(not vb.flathub_enabled())
 
-        discover = QPushButton(QIcon.fromTheme("plasmadiscover"), "Ouvrir Discover")
+        discover = QPushButton(QIcon.fromTheme("plasmadiscover"), "Ouvrir le Magasin d'applications")
         discover.clicked.connect(lambda: self.launch("plasma-discover"))
         row = QHBoxLayout()
         row.addWidget(btn)
@@ -372,7 +372,7 @@ class Bienvenue(QWidget):
         row.addStretch(1)
         return self.page("Applications populaires",
                          para("Cochez ce qui vous intéresse : tout est gratuit. Des milliers d'autres "
-                              "applications vous attendent dans Discover."),
+                              "applications vous attendent dans le Magasin d'applications."),
                          grid, row, task.bar, status, flathub)
 
     def page_windows(self):
@@ -397,7 +397,7 @@ class Bienvenue(QWidget):
         links = [
             ("Centre de protection", "protectos-logo", "protectos-protection"),
             ("Paramètres du système", "configure", "systemsettings"),
-            ("Discover", "plasmadiscover", "plasma-discover"),
+            ("Magasin d'applications", "plasmadiscover", "plasma-discover"),
             ("Programmes et fonctionnalités", "protectos-logo", "protectos-programmes"),
             ("Explorateur de fichiers", "system-file-manager", "dolphin"),
         ]

@@ -1,0 +1,13 @@
+{
+    "KPlugin": {
+        "Authors": [
+            {
+                "Name": "protect.OS"
+            }
+        ],
+        "Id": "ProtectOS-Alveoles",
+        "License": "CC-BY-SA-4.0",
+        "Name": "protect.OS Alvéoles",
+        "Name[fr]": "protect.OS Alvéoles"
+    }
+}

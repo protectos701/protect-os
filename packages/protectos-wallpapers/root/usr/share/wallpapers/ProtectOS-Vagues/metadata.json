@@ -1,0 +1,13 @@
+{
+    "KPlugin": {
+        "Authors": [
+            {
+                "Name": "protect.OS"
+            }
+        ],
+        "Id": "ProtectOS-Vagues",
+        "License": "CC-BY-SA-4.0",
+        "Name": "protect.OS Vagues d'or",
+        "Name[fr]": "protect.OS Vagues d'or"
+    }
+}

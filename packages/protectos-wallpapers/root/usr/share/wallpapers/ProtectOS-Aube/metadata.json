@@ -1,0 +1,13 @@
+{
+    "KPlugin": {
+        "Authors": [
+            {
+                "Name": "protect.OS"
+            }
+        ],
+        "Id": "ProtectOS-Aube",
+        "License": "CC-BY-SA-4.0",
+        "Name": "protect.OS Aube dorée",
+        "Name[fr]": "protect.OS Aube dorée"
+    }
+}

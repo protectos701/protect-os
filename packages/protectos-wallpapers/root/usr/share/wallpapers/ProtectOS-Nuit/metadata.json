@@ -1,0 +1,13 @@
+{
+    "KPlugin": {
+        "Authors": [
+            {
+                "Name": "protect.OS"
+            }
+        ],
+        "Id": "ProtectOS-Nuit",
+        "License": "CC-BY-SA-4.0",
+        "Name": "protect.OS Nuit étoilée",
+        "Name[fr]": "protect.OS Nuit étoilée"
+    }
+}

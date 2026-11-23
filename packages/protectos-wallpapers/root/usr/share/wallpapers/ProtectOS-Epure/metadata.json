@@ -1,0 +1,13 @@
+{
+    "KPlugin": {
+        "Authors": [
+            {
+                "Name": "protect.OS"
+            }
+        ],
+        "Id": "ProtectOS-Epure",
+        "License": "CC-BY-SA-4.0",
+        "Name": "protect.OS Épuré",
+        "Name[fr]": "protect.OS Épuré"
+    }
+}

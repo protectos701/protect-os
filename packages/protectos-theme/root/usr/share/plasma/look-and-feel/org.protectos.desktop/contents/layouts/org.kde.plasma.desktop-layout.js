@@ -3,7 +3,8 @@
 
 var panel = new Panel;
 panel.location = "bottom";
-panel.height = 2 * Math.floor(gridUnit * 2.6 / 2);
+panel.height = 2 * Math.floor(gridUnit * 2.9 / 2);
+panel.floating = true;
 
 // Espace extensible à gauche : pousse le menu et les icônes vers le centre (barre centrée)
 panel.addWidget("org.kde.plasma.panelspacer"); // barre-centree
@@ -13,10 +14,20 @@ var kickoff = panel.addWidget("org.kde.plasma.kickoff");
 kickoff.currentConfigGroup = ["General"];
 kickoff.writeConfig("icon", "protectos-start");
 kickoff.writeConfig("favoritesPortedToKAstats", "true");
+// Menu façon Windows 11 : favoris en grille, toutes les applications en liste, libellés sous les boutons d'arrêt
+kickoff.writeConfig("favoritesDisplay", "0");
+kickoff.writeConfig("applicationsDisplay", "1");
+kickoff.writeConfig("showActionButtonCaptions", "true");
+kickoff.writeConfig("highlightNewlyInstalledApps", "true");
+kickoff.writeConfig("switchCategoryOnHover", "true");
 
 // Applications épinglées
 var tasks = panel.addWidget("org.kde.plasma.icontasks");
 tasks.currentConfigGroup = ["General"];
+tasks.writeConfig("iconSpacing", "2");
+tasks.writeConfig("maxStripes", "1");
+tasks.writeConfig("indicateAudioStreams", "true");
+tasks.writeConfig("groupedTaskVisualization", "1");
 tasks.writeConfig("launchers", [
     "applications:org.kde.dolphin.desktop",
     "applications:firefox-esr.desktop",

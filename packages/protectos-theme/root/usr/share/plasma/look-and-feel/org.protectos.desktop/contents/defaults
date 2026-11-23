@@ -9,7 +9,7 @@ AccentColor=212,167,44
 Theme=ProtectOS
 
 [plasmarc][Theme]
-name=default
+name=protectos
 
 [kcminputrc][Mouse]
 cursorTheme=breeze_cursors

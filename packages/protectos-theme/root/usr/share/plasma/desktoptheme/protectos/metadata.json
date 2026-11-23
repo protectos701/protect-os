@@ -1,0 +1,16 @@
+{
+    "KPlugin": {
+        "Authors": [
+            {
+                "Name": "protect.OS"
+            }
+        ],
+        "Id": "protectos",
+        "License": "LGPL-2.1+",
+        "Name": "protect.OS",
+        "Description": "Style de bureau de protect.OS",
+        "Version": "1.0",
+        "Category": ""
+    },
+    "X-Plasma-API": "5.0"
+}

@@ -196,6 +196,21 @@ def main():
     shutil.rmtree(tmp, ignore_errors=True)
 
     last = analyse(shots[-1]) if shots and shots[-1].endswith(".png") else {}
+    # Aperçu de la dernière capture dans le journal (lisible sans télécharger les artefacts)
+    if shots and shots[-1].endswith(".png") and os.path.exists(shots[-1]):
+        try:
+            import base64
+            import io
+            from PIL import Image
+            b = io.BytesIO()
+            Image.open(shots[-1]).convert("RGB").resize((960, 540)).save(b, "JPEG", quality=80)
+            d = base64.b64encode(b.getvalue()).decode()
+            print("APERCU-DEBUT")
+            for i in range(0, len(d), 900):
+                print(d[i:i + 900])
+            print("APERCU-FIN", flush=True)
+        except Exception as e:  # l'aperçu est un bonus : il ne doit jamais faire échouer le test
+            print("Aperçu impossible :", e)
     ok = graphical_at is not None and fatal is None and last.get("noir", 0) < 0.9
     result = {
         "bureau_demarre": ok,

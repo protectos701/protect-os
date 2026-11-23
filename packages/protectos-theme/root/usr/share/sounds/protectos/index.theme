@@ -1,0 +1,8 @@
+[Sound Theme]
+Name=protect.OS
+Comment=Sons de protect.OS
+Inherits=ocean,freedesktop
+Directories=stereo
+
+[stereo]
+OutputProfile=stereo

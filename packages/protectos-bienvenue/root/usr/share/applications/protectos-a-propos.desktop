@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=À propos de protect.OS
+Comment=Version du système et caractéristiques de l'ordinateur
+Exec=protectos-a-propos
+Icon=protectos-logo
+Terminal=false
+Categories=Qt;Settings;System;
+Keywords=à propos;version;système;ordinateur;processeur;mémoire;caractéristiques;infos;

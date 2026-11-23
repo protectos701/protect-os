@@ -1,0 +1,210 @@
+#!/usr/bin/python3
+"""À propos de protect.OS : version du système et caractéristiques de l'ordinateur."""
+import os
+import platform
+import re
+import shutil
+import subprocess
+import sys
+
+OR = "#d4a72c"
+
+
+def os_release():
+    infos = {}
+    for chemin in ("/etc/os-release", "/usr/lib/os-release"):
+        try:
+            for ligne in open(chemin, encoding="utf-8"):
+                if "=" in ligne:
+                    k, v = ligne.rstrip("\n").split("=", 1)
+                    infos[k] = v.strip('"')
+            break
+        except OSError:
+            continue
+    return infos
+
+
+def lire(chemin):
+    try:
+        return open(chemin, encoding="utf-8", errors="replace").read().strip()
+    except OSError:
+        return ""
+
+
+def ordinateur():
+    fabricant = lire("/sys/class/dmi/id/sys_vendor")
+    modele = lire("/sys/class/dmi/id/product_name")
+    vide = {"", "To Be Filled By O.E.M.", "System Product Name", "Default string", "System manufacturer"}
+    morceaux = [m for m in (fabricant, modele) if m not in vide]
+    if "innotek" in fabricant.lower() or "VirtualBox" in modele:
+        return "Machine virtuelle VirtualBox"
+    if "QEMU" in fabricant or "QEMU" in modele:
+        return "Machine virtuelle"
+    return " ".join(morceaux) or "Ordinateur"
+
+
+def processeur():
+    for ligne in lire("/proc/cpuinfo").splitlines():
+        if ligne.startswith("model name"):
+            nom = ligne.split(":", 1)[1].strip()
+            nom = re.sub(r"\((R|TM|tm|r)\)|CPU|Processor|\s+@.*$", "", nom)
+            return f"{re.sub(r' {2,}', ' ', nom).strip()} ({os.cpu_count()} cœurs)"
+    return f"{platform.machine()} ({os.cpu_count()} cœurs)"
+
+
+def memoire():
+    m = re.search(r"MemTotal:\s+(\d+)", lire("/proc/meminfo"))
+    if not m:
+        return "?"
+    go = int(m.group(1)) / 1024 / 1024
+    return f"{round(go)} Go" if go >= 3 else f"{go:.1f} Go"
+
+
+def graphisme():
+    try:
+        r = subprocess.run(["lspci", "-mm"], capture_output=True, text=True, timeout=3)
+    except (OSError, subprocess.TimeoutExpired):
+        return "?"
+    cartes = []
+    for ligne in r.stdout.splitlines():
+        champs = re.findall(r'"([^"]*)"', ligne)
+        if len(champs) >= 3 and re.search(r"VGA|3D|Display", champs[0]):
+            fab = champs[1].replace(" Corporation", "").replace("Advanced Micro Devices, Inc. [AMD/ATI]", "AMD")
+            nom = re.sub(r"^.*\[(.+)\].*$", r"\1", champs[2])
+            cartes.append(f"{fab} {nom}".strip())
+    return " + ".join(cartes) or "?"
+
+
+def stockage():
+    try:
+        u = shutil.disk_usage("/")
+    except OSError:
+        return "?"
+    return f"{u.free / 1e9:.0f} Go libres sur {u.total / 1e9:.0f} Go"
+
+
+def windows():
+    return "Activée (programmes .exe)" if shutil.which("wine") else "Non installée"
+
+
+def infos():
+    osr = os_release()
+    nom = osr.get("NAME", "protect.OS")
+    version = osr.get("VERSION", osr.get("VERSION_ID", ""))
+    return nom, version, [
+        ("Ordinateur", ordinateur()),
+        ("Processeur", processeur()),
+        ("Mémoire", memoire()),
+        ("Graphisme", graphisme()),
+        ("Stockage", stockage()),
+        ("Compatibilité Windows", windows()),
+    ]
+
+
+if "--texte" in sys.argv:
+    nom, version, lignes = infos()
+    print(f"{nom} {version}".strip())
+    for k, v in lignes:
+        print(f"{k} : {v}")
+    sys.exit(0)
+
+from PyQt6.QtCore import QProcess, Qt  # noqa: E402
+from PyQt6.QtGui import QFont, QGuiApplication, QIcon  # noqa: E402
+from PyQt6.QtWidgets import (QApplication, QFrame, QGridLayout, QHBoxLayout, QLabel, QPushButton,  # noqa: E402
+                             QVBoxLayout, QWidget)
+
+STYLE = f"""
+#banniere {{ background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #16307a, stop:1 #060f2e);
+            border-bottom: 2px solid {OR}; }}
+#banniere QLabel {{ color: #eef2fb; }}
+#nom {{ color: #f3d27a; }}
+QFrame#carte {{ border: 1px solid rgba(212,167,44,0.35); border-radius: 10px; }}
+QLabel#cle {{ color: palette(placeholder-text); }}
+"""
+
+
+class APropos(QWidget):
+    def __init__(self):
+        super().__init__()
+        nom, version, lignes = infos()
+        self.texte = f"{nom} {version}\n" + "\n".join(f"{k} : {v}" for k, v in lignes)
+        self.setWindowTitle(f"À propos de {nom}")
+        self.setWindowIcon(QIcon.fromTheme("protectos-logo"))
+        self.setStyleSheet(STYLE)
+        self.setMinimumWidth(560)
+
+        banniere = QWidget()
+        banniere.setObjectName("banniere")
+        bv = QVBoxLayout(banniere)
+        bv.setContentsMargins(24, 26, 24, 22)
+        bv.setSpacing(6)
+        logo = QLabel()
+        logo.setPixmap(QIcon.fromTheme("protectos-logo").pixmap(96, 96))
+        logo.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        titre = QLabel(nom)
+        titre.setObjectName("nom")
+        f = QFont(titre.font())
+        f.setPointSizeF(f.pointSizeF() * 2.0)
+        f.setBold(True)
+        titre.setFont(f)
+        titre.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        sous = QLabel(f"Version {version}" if version else "")
+        sous.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        bv.addWidget(logo)
+        bv.addWidget(titre)
+        bv.addWidget(sous)
+
+        carte = QFrame()
+        carte.setObjectName("carte")
+        g = QGridLayout(carte)
+        g.setContentsMargins(18, 14, 18, 14)
+        g.setHorizontalSpacing(18)
+        g.setVerticalSpacing(10)
+        for i, (k, v) in enumerate(lignes):
+            cle = QLabel(k)
+            cle.setObjectName("cle")
+            val = QLabel(v)
+            val.setWordWrap(True)
+            val.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+            g.addWidget(cle, i, 0, Qt.AlignmentFlag.AlignTop)
+            g.addWidget(val, i, 1)
+        g.setColumnStretch(1, 1)
+
+        copier = QPushButton(QIcon.fromTheme("edit-copy"), "Copier les informations")
+        copier.clicked.connect(self.copier)
+        protection = QPushButton(QIcon.fromTheme("protectos-logo"), "Centre de protection")
+        protection.clicked.connect(lambda: QProcess.startDetached("protectos-protection", []))
+        boutons = QHBoxLayout()
+        boutons.addWidget(copier)
+        boutons.addStretch(1)
+        boutons.addWidget(protection)
+        self.message = QLabel("")
+
+        corps = QVBoxLayout()
+        corps.setContentsMargins(22, 18, 22, 18)
+        corps.setSpacing(12)
+        corps.addWidget(carte)
+        corps.addLayout(boutons)
+        corps.addWidget(self.message)
+
+        lay = QVBoxLayout(self)
+        lay.setContentsMargins(0, 0, 0, 0)
+        lay.addWidget(banniere)
+        lay.addLayout(corps)
+
+    def copier(self):
+        QGuiApplication.clipboard().setText(self.texte)
+        self.message.setText("Informations copiées : vous pouvez les coller dans un message.")
+
+
+def main():
+    app = QApplication(sys.argv)
+    app.setApplicationName("À propos de protect.OS")
+    app.setDesktopFileName("protectos-a-propos")
+    w = APropos()
+    w.show()
+    return app.exec()
+
+
+if __name__ == "__main__":
+    sys.exit(main())

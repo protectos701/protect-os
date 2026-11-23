@@ -24,3 +24,7 @@ kcm_about-distro=false
 kcm_kdeconnect=false
 kcm_feedback=false
 kcm_plasmasearch=true
+
+# Sons de protect.OS (notifications, clé USB, corbeille…)
+[Sounds]
+Theme=protectos

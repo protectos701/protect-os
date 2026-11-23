@@ -1,0 +1,8 @@
+# protect.OS : une mélodie à l'ouverture et à la fermeture de session
+[Event/startkde]
+Action=Sound
+Sound=desktop-login
+
+[Event/exitkde]
+Action=Sound
+Sound=desktop-logout

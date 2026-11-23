@@ -45,6 +45,9 @@ jobs:
           bleu = sum(1 for r, g, b in px if b > r + 20 and b > g) / n
           orr = sum(1 for r, g, b in px if r > 150 and g > 110 and b < 110) / n
           print(f"Capture : {bleu:.0%} de bleu, {orr:.1%} d'or, {noir:.0%} de noir")
+          import base64, io
+          b = io.BytesIO(); Image.open("connexion.png").convert("RGB").resize((960, 540)).save(b, "JPEG", quality=80)
+          print("APERCU-DEBUT"); print(base64.b64encode(b.getvalue()).decode()); print("APERCU-FIN")
           PY
           if grep -Eq "\.qml:[0-9]+.*(error|Error|is not a type|not defined|Cannot|Unable)" greeter.log; then
             echo "::error::L'écran de connexion contient une erreur (voir le journal ci-dessus)"; exit 1

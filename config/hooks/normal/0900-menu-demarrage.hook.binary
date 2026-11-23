@@ -1,0 +1,44 @@
+#!/bin/sh
+# Remplace l'image Debian (casque jaune) du menu de démarrage de l'ISO par celle de protect.OS.
+set -e
+python3 - <<'PY'
+import glob, os
+from PIL import Image, ImageDraw, ImageFont, ImageOps
+
+racine = next(d for d in (".", "..", "../..") if os.path.isdir(os.path.join(d, "packages")))
+fond = os.path.join(racine, "packages/protectos-wallpapers/root/usr/share/wallpapers/ProtectOS/contents/images/1920x1080.png")
+logo = os.path.join(racine, "packages/protectos-plymouth/root/usr/share/plymouth/themes/protectos/logo.png")
+nom = "protect.OS"
+try:
+    import configparser
+    c = configparser.ConfigParser(); c.read(os.path.join(racine, "ma-personnalisation.conf"), encoding="utf-8")
+    nom = c.get("identite", "nom", fallback=nom) or nom
+except Exception:
+    pass
+
+def police(taille):
+    for f in ("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",):
+        if os.path.exists(f):
+            return ImageFont.truetype(f, taille)
+    return ImageFont.load_default()
+
+images = [f for f in glob.glob("**/splash*.png", recursive=True) if "/chroot/" not in f]
+for f in images:
+    w, h = Image.open(f).size
+    img = ImageOps.fit(Image.open(fond).convert("RGB"), (w, h), Image.LANCZOS)
+    voile = Image.new("RGB", (w, h), (4, 10, 32))
+    img = Image.blend(img, voile, 0.6)  # assombrit pour que le menu reste lisible
+    t = int(h * 0.22)
+    lg = Image.open(logo).convert("RGBA")
+    lg = lg.resize((int(lg.width * t / lg.height), t), Image.LANCZOS)
+    x, y = int(w * 0.06), int(h * 0.06)
+    img.paste(lg, (x, y), lg)
+    d = ImageDraw.Draw(img)
+    d.text((x + lg.width + int(w * 0.03), y + int(t * 0.18)), nom, font=police(int(h * 0.075)), fill="#e8c15a")
+    d.text((x + lg.width + int(w * 0.03), y + int(t * 0.62)), "Session d'essai et installation",
+           font=police(int(h * 0.035)), fill="#eef2fb")
+    img.save(f)
+    print(f"Menu de démarrage : {f} ({w}x{h}) remplacé")
+if not images:
+    print("Menu de démarrage : aucune image trouvée (rien à remplacer)")
+PY

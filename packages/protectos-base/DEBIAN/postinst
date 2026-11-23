@@ -21,8 +21,15 @@ activer_pare_feu() {
 	touch "$FLAG"
 }
 
+# Texte des écrans de connexion en mode texte (Ctrl+Alt+F2…)
+identite_texte() {
+	printf 'protect.OS \\l\n\n' > /etc/issue
+	printf 'protect.OS\n' > /etc/issue.net
+}
+
 case "$1" in
 	configure)
+		identite_texte
 		activer_pare_feu
 		/usr/lib/protectos/protectos-identite tout || true
 		if command -v deb-systemd-helper >/dev/null 2>&1; then
@@ -35,6 +42,7 @@ case "$1" in
 		;;
 	triggered)
 		activer_pare_feu
+		identite_texte
 		/usr/lib/protectos/protectos-identite applications || true
 		/usr/lib/protectos/protectos-identite sessions || true
 		;;

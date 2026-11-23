@@ -4,3 +4,5 @@ interest-noawait /etc/ufw/ufw.conf
 interest-noawait /usr/share/applications
 interest-noawait /usr/share/wayland-sessions
 interest-noawait /usr/share/xsessions
+# Réécrire le texte de connexion si une mise à jour le remet
+interest-noawait /etc/issue

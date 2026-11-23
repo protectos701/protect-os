@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Bienvenue dans protect.OS
+Exec=protectos-bienvenue --premier-demarrage
+Icon=protectos-logo
+OnlyShowIn=KDE;
+NoDisplay=true
+X-KDE-autostart-phase=2

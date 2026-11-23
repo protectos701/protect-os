@@ -1,0 +1,7 @@
+[Unit]
+Description=protect.OS : contrôle parental (temps d'écran)
+ConditionPathExists=/etc/protectos/parental.json
+
+[Service]
+Type=oneshot
+ExecStart=/usr/lib/protectos/protectos-parental-root tick

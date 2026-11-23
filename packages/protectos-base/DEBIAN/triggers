@@ -1,0 +1,2 @@
+# Réagir quand le pare-feu ufw est installé, pour l'activer une première fois
+interest-noawait /etc/ufw/ufw.conf

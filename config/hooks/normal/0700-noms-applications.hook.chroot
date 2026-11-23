@@ -1,0 +1,27 @@
+#!/bin/sh
+# Créé par tools/personnaliser.py à partir de ma-personnalisation.conf — ne pas modifier.
+# Donne à chaque application le nom choisi, sans toucher au logiciel lui-même :
+# une copie renommée de son raccourci est placée dans /usr/local/share/applications.
+set -e
+renommer() {
+	src="/usr/share/applications/$1"
+	[ -f "$src" ] || { echo "protect.OS : $1 absent, nom inchangé"; return 0; }
+	mkdir -p /usr/local/share/applications
+	awk -v nom="$2" '
+		/^\[/ { section = $0 }
+		section == "[Desktop Entry]" && /^Name(\[[^]]*\])?=/ { if (!fait) { print "Name=" nom; fait = 1 }; next }
+		{ print }
+	' "$src" > "/usr/local/share/applications/$1"
+}
+renommer org.kde.dolphin.desktop "Explorateur de fichiers"
+renommer org.kde.konsole.desktop "Terminal"
+renommer org.kde.spectacle.desktop "Capture d'écran"
+renommer org.kde.plasma-systemmonitor.desktop "Gestionnaire des tâches"
+renommer org.kde.okular.desktop "Lecteur PDF"
+renommer org.kde.gwenview.desktop "Photos"
+renommer org.kde.kate.desktop "Bloc-notes"
+renommer org.kde.kcalc.desktop "Calculatrice"
+renommer org.kde.discover.desktop "Magasin d'applications"
+renommer systemsettings.desktop "Paramètres"
+renommer org.kde.ark.desktop "Archives"
+renommer org.kde.partitionmanager.desktop "Gestionnaire de disques"

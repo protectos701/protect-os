@@ -1,0 +1,23 @@
+# Créé par tools/personnaliser.py à partir de ma-personnalisation.conf — ne pas modifier.
+# Raccourcis clavier par défaut de protect.OS (modifiables dans Paramètres → Raccourcis).
+
+[services][org.kde.dolphin.desktop]
+_launch=Meta+E
+
+[services][org.kde.plasma-systemmonitor.desktop]
+_launch=Ctrl+Shift+Esc
+
+[services][systemsettings.desktop]
+_launch=Meta+I
+
+[services][org.kde.konsole.desktop]
+_launch=Ctrl+Alt+T
+
+[services][org.kde.spectacle.desktop]
+RectangularRegionScreenShot=Meta+Shift+S
+
+[services][org.kde.krunner.desktop]
+_launch=Alt+Space	Meta+R
+
+[services][protectos-protection.desktop]
+_launch=Meta+Shift+P

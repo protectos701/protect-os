@@ -1,0 +1,31 @@
+#!/bin/sh
+# Réglages propres à l'image d'essai, exécutés pendant la construction de l'ISO.
+# Tout le reste (thème, identité, démarrage) est dans les paquets protectos-*.
+set -e
+
+echo "protect.OS : masquage du lanceur d'installation Debian (remplacé par « Installer protect.OS »)"
+for f in /usr/share/applications/install-debian.desktop /usr/share/applications/calamares.desktop; do
+	if [ -f "$f" ] && ! grep -q '^NoDisplay=true' "$f"; then
+		echo "NoDisplay=true" >> "$f"
+	fi
+done
+
+echo "protect.OS : compatibilité Windows 32 bits (wine32:i386)"
+# Dans Debian 13, Wine a besoin de sa partie 32 bits pour les programmes Windows 32 bits.
+dpkg --add-architecture i386
+apt-get update
+apt-get install -y wine32:i386 || echo "protect.OS : AVERTISSEMENT, wine32:i386 n'a pas pu être installé"
+
+echo "protect.OS : Flathub dans Discover"
+if command -v flatpak >/dev/null 2>&1; then
+	flatpak remote-add --system --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo \
+		|| echo "protect.OS : AVERTISSEMENT, Flathub n'a pas pu être ajouté"
+fi
+
+echo "protect.OS : liste du bloqueur de publicités et de traqueurs"
+if [ -x /usr/lib/protectos/protectos-bloqueur ]; then
+	/usr/lib/protectos/protectos-bloqueur mettre-a-jour \
+		|| echo "protect.OS : AVERTISSEMENT, la liste sera téléchargée au premier démarrage"
+fi
+
+echo "protect.OS : réglages de l'image d'essai terminés"

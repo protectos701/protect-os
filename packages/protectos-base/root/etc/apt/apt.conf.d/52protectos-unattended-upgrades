@@ -1,0 +1,10 @@
+// protect.OS : en plus des correctifs de sécurité de Debian (déjà prévus par
+// unattended-upgrades), installer automatiquement les mises à jour de protect.OS.
+Unattended-Upgrade::Origins-Pattern {
+	"origin=protect.OS,label=protect.OS";
+};
+// Ne jamais redémarrer l'ordinateur sans l'utilisateur
+Unattended-Upgrade::Automatic-Reboot "false";
+// Retirer les anciens noyaux et dépendances devenues inutiles
+Unattended-Upgrade::Remove-Unused-Kernel-Packages "true";
+Unattended-Upgrade::Remove-Unused-Dependencies "true";

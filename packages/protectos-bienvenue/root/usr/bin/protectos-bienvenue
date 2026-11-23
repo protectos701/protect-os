@@ -1,0 +1,426 @@
+#!/usr/bin/python3
+"""« Bienvenue dans protect.OS » : l'assistant du premier démarrage de protect.OS.
+
+  protectos-bienvenue                    ouvre l'assistant
+  protectos-bienvenue --premier-demarrage  ne s'ouvre que si l'assistant n'a pas encore été terminé
+"""
+import os
+import sys
+
+sys.path.insert(0, "/usr/lib/protectos")
+import protectos_bienvenue as vb  # noqa: E402
+
+from PyQt6.QtCore import QProcess, Qt  # noqa: E402
+from PyQt6.QtGui import QFont, QIcon  # noqa: E402
+from PyQt6.QtWidgets import (  # noqa: E402
+    QApplication, QButtonGroup, QCheckBox, QFrame, QGridLayout, QHBoxLayout, QLabel, QListWidget,
+    QListWidgetItem, QProgressBar, QPushButton, QRadioButton, QStackedWidget, QVBoxLayout, QWidget)
+
+GOLD = "#d4a72c"
+STYLE = f"""
+#banniere {{ background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #16307a, stop:1 #060f2e);
+            border-bottom: 2px solid {GOLD}; }}
+#banniere QLabel {{ color: #eef2fb; }}
+#titreBanniere {{ color: #e8c15a; }}
+#etapes {{ border: none; background: transparent; }}
+#etapes::item {{ padding: 9px 12px; border-radius: 8px; margin: 2px 0; }}
+#etapes::item:selected {{ background: rgba(212,167,44,0.22); color: palette(text);
+                          border-left: 3px solid {GOLD}; }}
+QPushButton#principal {{ background: {GOLD}; color: #1a1405; border: none; border-radius: 6px;
+                         padding: 8px 18px; font-weight: bold; }}
+QPushButton#principal:disabled {{ background: rgba(212,167,44,0.4); }}
+QFrame#carte {{ border: 1px solid rgba(212,167,44,0.45); border-radius: 10px; }}
+"""
+
+
+def heading(text, scale=1.45):
+    lab = QLabel(text)
+    f = QFont(lab.font())
+    f.setPointSizeF(f.pointSizeF() * scale)
+    f.setBold(True)
+    lab.setFont(f)
+    lab.setWordWrap(True)
+    return lab
+
+
+def para(text):
+    lab = QLabel(text)
+    lab.setWordWrap(True)
+    lab.setTextFormat(Qt.TextFormat.RichText)
+    lab.setOpenExternalLinks(True)
+    return lab
+
+
+def card(*widgets):
+    fr = QFrame()
+    fr.setObjectName("carte")
+    lay = QVBoxLayout(fr)
+    lay.setContentsMargins(16, 14, 16, 14)
+    for w in widgets:
+        if isinstance(w, QHBoxLayout):
+            lay.addLayout(w)
+        else:
+            lay.addWidget(w)
+    return fr
+
+
+class Task:
+    """Une action administrateur avec sa barre de progression et son message."""
+
+    def __init__(self, parent, button, label):
+        self.parent, self.button, self.label = parent, button, label
+        self.bar = QProgressBar()
+        self.bar.setRange(0, 0)
+        self.bar.hide()
+        self.proc = None
+
+    def run(self, args, busy_text, ok_text, on_ok=None):
+        if self.proc:
+            return
+        self.button.setEnabled(False)
+        self.bar.show()
+        self.label.setText(busy_text)
+        self.proc = QProcess(self.parent)
+
+        def done(code):
+            self.proc = None
+            self.bar.hide()
+            if code == 0:
+                self.label.setText(ok_text)
+                if on_ok:
+                    on_ok()
+            else:
+                self.button.setEnabled(True)
+                self.label.setText("Annulé." if code in (126, 127) else
+                                   "L'installation n'a pas abouti. Vérifiez la connexion Internet puis réessayez.")
+
+        self.proc.finished.connect(lambda code, _s: done(code))
+        self.proc.errorOccurred.connect(lambda e: done(-1) if e == QProcess.ProcessError.FailedToStart else None)
+        self.proc.start("pkexec", [vb.ROOT_HELPER] + args)
+
+
+class Bienvenue(QWidget):
+    def __init__(self):
+        super().__init__()
+        self.setWindowTitle("Bienvenue dans protect.OS")
+        self.setWindowIcon(QIcon.fromTheme("protectos-logo"))
+        self.setStyleSheet(STYLE)
+        self.resize(900, 600)
+        rel = vb.os_release()
+
+        # Bannière
+        banner = QWidget()
+        banner.setObjectName("banniere")
+        bl = QHBoxLayout(banner)
+        bl.setContentsMargins(24, 16, 24, 16)
+        logo = QLabel()
+        logo.setPixmap(QIcon.fromTheme("protectos-logo").pixmap(56, 56))
+        t = heading(rel.get("PRETTY_NAME", "protect.OS"), 1.7)
+        t.setObjectName("titreBanniere")
+        st = QLabel("Quelques réglages et vous êtes prêt. Tout reste modifiable plus tard.")
+        tv = QVBoxLayout()
+        tv.addWidget(t)
+        tv.addWidget(st)
+        bl.addWidget(logo)
+        bl.addSpacing(10)
+        bl.addLayout(tv, 1)
+
+        # Étapes
+        self.steps = QListWidget()
+        self.steps.setObjectName("etapes")
+        self.steps.setFixedWidth(210)
+        self.pages = QStackedWidget()
+        pages = [
+            ("Accueil", "go-home", self.page_accueil()),
+            ("Apparence", "preferences-desktop-theme", self.page_apparence()),
+            ("Pilotes", "video-display", self.page_pilotes()),
+            ("Sauvegardes", "document-save", self.page_sauvegardes()),
+            ("Applications", "plasmadiscover", self.page_applis()),
+            ("Programmes Windows", "wine", self.page_windows()),
+            ("C'est prêt", "dialog-ok-apply", self.page_fin()),
+        ]
+        for name, icon, page in pages:
+            QListWidgetItem(QIcon.fromTheme(icon), name, self.steps)
+            self.pages.addWidget(page)
+        self.steps.currentRowChanged.connect(self.go)
+
+        # Navigation
+        self.prev = QPushButton("Précédent")
+        self.prev.clicked.connect(lambda: self.steps.setCurrentRow(self.pages.currentIndex() - 1))
+        self.next = QPushButton("Suivant")
+        self.next.setObjectName("principal")
+        self.next.clicked.connect(self.forward)
+        self.show_again = QCheckBox("Afficher au démarrage")
+        self.show_again.setChecked(False)  # par défaut, l'assistant ne revient pas
+        nav = QHBoxLayout()
+        nav.addWidget(self.show_again)
+        nav.addStretch(1)
+        nav.addWidget(self.prev)
+        nav.addWidget(self.next)
+
+        body = QHBoxLayout()
+        body.setContentsMargins(16, 16, 20, 8)
+        body.addWidget(self.steps)
+        body.addSpacing(12)
+        body.addWidget(self.pages, 1)
+
+        lay = QVBoxLayout(self)
+        lay.setContentsMargins(0, 0, 0, 14)
+        lay.addWidget(banner)
+        lay.addLayout(body, 1)
+        nav.setContentsMargins(20, 0, 20, 0)
+        lay.addLayout(nav)
+        self.steps.setCurrentRow(0)
+
+    # ------------------------------------------------------------ navigation
+    def go(self, row):
+        if row < 0:
+            return
+        self.pages.setCurrentIndex(row)
+        self.prev.setEnabled(row > 0)
+        last = row == self.pages.count() - 1
+        self.next.setText("Terminer" if last else "Suivant")
+
+    def forward(self):
+        i = self.pages.currentIndex()
+        if i == self.pages.count() - 1:
+            self.close()
+        else:
+            self.steps.setCurrentRow(i + 1)
+
+    def closeEvent(self, ev):
+        if not vb.is_live():
+            vb.set_show_at_login(self.show_again.isChecked())
+        super().closeEvent(ev)
+
+    def page(self, title, *items):
+        w = QWidget()
+        v = QVBoxLayout(w)
+        v.setContentsMargins(0, 0, 0, 0)
+        v.setSpacing(14)
+        v.addWidget(heading(title))
+        for it in items:
+            if isinstance(it, (QHBoxLayout, QVBoxLayout, QGridLayout)):
+                v.addLayout(it)
+            else:
+                v.addWidget(it)
+        v.addStretch(1)
+        return w
+
+    @staticmethod
+    def launch(cmd, *args):
+        QProcess.startDetached(cmd, list(args))
+
+    # ------------------------------------------------------------ pages
+    def page_accueil(self):
+        items = [para("protect.OS est un système libre, rapide et sûr, construit sur Debian. "
+                      "Cet assistant vous aide à le régler à votre goût en quelques minutes.")]
+        if vb.is_live():
+            b = QPushButton(QIcon.fromTheme("protectos-logo"), "Installer protect.OS sur cet ordinateur")
+            b.setObjectName("principal")
+            b.clicked.connect(lambda: self.launch("protectos-lancer-installation"))
+            items.append(card(para("<b>Vous êtes dans la session d'essai.</b> Rien n'est modifié sur votre "
+                                   "ordinateur tant que vous n'installez pas protect.OS.<br><br>"
+                                   "Conseil : pendant l'installation, cochez <b>« Chiffrer le système »</b> "
+                                   "pour protéger vos fichiers en cas de vol, et sauvegardez d'abord vos "
+                                   "fichiers si vous remplacez Windows."), b))
+        tips = [
+            ("Menu Démarrer", "Le logo protect.OS en bas de l'écran ouvre le menu : tapez simplement le nom "
+                              "d'une application pour la trouver."),
+            ("Discover", "Le magasin d'applications : des milliers de logiciels gratuits et les mises à jour."),
+            ("Programmes Windows", "Double-cliquez sur un fichier .exe pour l'installer, comme sous Windows."),
+        ]
+        for name, text in tips:
+            items.append(para(f"<b>{name}</b> — {text}"))
+        return self.page("Bienvenue !", *items)
+
+    def page_apparence(self):
+        group = QButtonGroup(self)
+        dark = QRadioButton("Sombre — bleu nuit et or")
+        light = QRadioButton("Clair — blanc bleuté et or")
+        group.addButton(dark)
+        group.addButton(light)
+        (light if vb.current_scheme() == "clair" else dark).setChecked(True)
+        dark.toggled.connect(lambda on: on and vb.apply_scheme("sombre"))
+        light.toggled.connect(lambda on: on and vb.apply_scheme("clair"))
+        more = QPushButton(QIcon.fromTheme("preferences-desktop-theme-global"), "Plus de réglages d'apparence")
+        more.clicked.connect(lambda: self.launch("systemsettings", "kcm_lookandfeel"))
+        row = QHBoxLayout()
+        row.addWidget(more)
+        row.addStretch(1)
+        return self.page("Apparence",
+                         para("Choisissez l'ambiance de protect.OS. Le changement est immédiat."),
+                         card(dark, light), row)
+
+    def page_pilotes(self):
+        gpus = vb.detect_gpus()
+        nvidia = [g for g in gpus if g["marque"] == "nvidia"]
+        items = []
+        if gpus:
+            items.append(para("Carte graphique détectée : " + ", ".join(f"<b>{g['nom']}</b>" for g in gpus)))
+        if not nvidia:
+            items.append(card(para("Votre matériel est pris en charge directement par protect.OS : "
+                                   "aucun pilote supplémentaire n'est nécessaire.")))
+            return self.page("Pilotes", *items)
+        status = QLabel("")
+        status.setWordWrap(True)
+        btn = QPushButton(QIcon.fromTheme("run-install"), "Installer le pilote NVIDIA")
+        btn.setObjectName("principal")
+        task = Task(self, btn, status)
+        if vb.nvidia_installed():
+            btn.setEnabled(False)
+            status.setText("Le pilote NVIDIA est déjà installé.")
+        btn.clicked.connect(lambda: task.run(
+            ["nvidia"], "Installation du pilote NVIDIA… (5 à 10 minutes)",
+            "Pilote installé. Redémarrez l'ordinateur pour l'utiliser."))
+        text = ("Pour les jeux et la vidéo, le pilote officiel de NVIDIA donne de bien meilleures performances. "
+                "Votre mot de passe vous sera demandé.")
+        if vb.secure_boot_enabled():
+            text += ("<br><br><b>Démarrage sécurisé (Secure Boot) actif :</b> au redémarrage, un écran bleu vous "
+                     "demandera d'enregistrer une clé. Choisissez « Enroll MOK » et saisissez le mot de passe "
+                     "demandé pendant l'installation.")
+        row = QHBoxLayout()
+        row.addWidget(btn)
+        row.addStretch(1)
+        items.append(card(para(text), row, task.bar, status))
+        return self.page("Pilotes", *items)
+
+    def page_sauvegardes(self):
+        status = QLabel("")
+        status.setWordWrap(True)
+        open_btn = QPushButton(QIcon.fromTheme("timeshift"), "Ouvrir Timeshift")
+        open_btn.clicked.connect(lambda: self.launch("timeshift-launcher"))
+        inst = QPushButton(QIcon.fromTheme("run-install"), "Installer Timeshift")
+        inst.setObjectName("principal")
+        task = Task(self, inst, status)
+        have = vb.package_installed("timeshift")
+        inst.setVisible(not have)
+        open_btn.setVisible(have)
+
+        def installed():
+            inst.hide()
+            open_btn.show()
+
+        inst.clicked.connect(lambda: task.run(["sauvegardes"], "Installation de Timeshift…",
+                                              "Timeshift est installé. Ouvrez-le pour choisir le disque "
+                                              "et la fréquence des sauvegardes.", installed))
+        row = QHBoxLayout()
+        row.addWidget(inst)
+        row.addWidget(open_btn)
+        row.addStretch(1)
+        return self.page("Sauvegardes",
+                         para("Timeshift prend des « photos » régulières du système. Si une mise à jour "
+                              "ou une manipulation pose problème, vous revenez en arrière en quelques clics, "
+                              "comme avec les points de restauration de Windows."),
+                         card(para("Conseil : une photo par jour et une par semaine, sur un disque qui a "
+                                   "au moins 20 Go libres."), row, task.bar, status))
+
+    def page_applis(self):
+        grid = QGridLayout()
+        grid.setHorizontalSpacing(18)
+        self.app_checks = []
+        for i, (pkgs, name, desc, icon) in enumerate(vb.APPS):
+            cb = QCheckBox(f"{name} — {desc}")
+            cb.setIcon(QIcon.fromTheme(icon, QIcon.fromTheme("application-x-executable")))
+            if vb.package_installed(pkgs[0]):
+                cb.setChecked(True)
+                cb.setEnabled(False)
+                cb.setText(f"{name} — déjà installé")
+            self.app_checks.append((cb, pkgs))
+            grid.addWidget(cb, i // 2, i % 2)
+        status = QLabel("")
+        status.setWordWrap(True)
+        btn = QPushButton(QIcon.fromTheme("run-install"), "Installer la sélection")
+        btn.setObjectName("principal")
+        task = Task(self, btn, status)
+
+        def install():
+            chosen = [p for cb, pkgs in self.app_checks if cb.isChecked() and cb.isEnabled() for p in pkgs]
+            if not chosen:
+                status.setText("Cochez au moins une application.")
+                return
+            note = (" En installant Steam, vous acceptez la licence de Valve."
+                    if "steam-installer" in chosen else "")
+            task.run(["applis"] + chosen, "Installation en cours… (quelques minutes)." + note,
+                     "C'est installé : retrouvez vos applications dans le menu Démarrer.",
+                     lambda: [cb.setEnabled(False) for cb, _ in self.app_checks if cb.isChecked()])
+
+        btn.clicked.connect(install)
+
+        # Flathub : des milliers d'applications de plus dans Discover
+        fh_status = QLabel("")
+        fh_status.setWordWrap(True)
+        fh_btn = QPushButton(QIcon.fromTheme("flatpak-discover", QIcon.fromTheme("plasmadiscover")),
+                             "Activer Flathub")
+        fh_task = Task(self, fh_btn, fh_status)
+        fh_btn.clicked.connect(lambda: fh_task.run(
+            ["flathub"], "Activation de Flathub…",
+            "Flathub est activé : ses applications apparaissent dans Discover."))
+        fh_row = QHBoxLayout()
+        fh_row.addWidget(fh_btn)
+        fh_row.addStretch(1)
+        flathub = card(para("<b>Encore plus d'applications avec Flathub</b> — Spotify, Discord, Zoom, "
+                            "Signal, VS Code… s'installent depuis Discover, à jour et isolées du système."),
+                       fh_row, fh_task.bar, fh_status)
+        flathub.setVisible(not vb.flathub_enabled())
+
+        discover = QPushButton(QIcon.fromTheme("plasmadiscover"), "Ouvrir Discover")
+        discover.clicked.connect(lambda: self.launch("plasma-discover"))
+        row = QHBoxLayout()
+        row.addWidget(btn)
+        row.addWidget(discover)
+        row.addStretch(1)
+        return self.page("Applications populaires",
+                         para("Cochez ce qui vous intéresse : tout est gratuit. Des milliers d'autres "
+                              "applications vous attendent dans Discover."),
+                         grid, row, task.bar, status, flathub)
+
+    def page_windows(self):
+        b = QPushButton(QIcon.fromTheme("protectos-logo"), "Ouvrir « Programmes et fonctionnalités »")
+        b.clicked.connect(lambda: self.launch("protectos-programmes"))
+        row = QHBoxLayout()
+        row.addWidget(b)
+        row.addStretch(1)
+        return self.page(
+            "Programmes Windows",
+            para("protect.OS sait installer beaucoup de programmes Windows, comme Windows :"),
+            para("1. Téléchargez le programme (fichier <b>.exe</b> ou <b>.msi</b>).<br>"
+                 "2. Double-cliquez dessus : l'Installateur protect.OS vous demande confirmation.<br>"
+                 "3. L'installateur du programme s'ouvre : suivez-le comme sous Windows.<br>"
+                 "4. Le programme apparaît dans le menu Démarrer."),
+            card(para("Pour désinstaller, ouvrez <b>Programmes et fonctionnalités</b>. Les logiciels "
+                      "classiques fonctionnent bien ; les pilotes de matériel et les jeux avec anti-triche, "
+                      "non."), row))
+
+    def page_fin(self):
+        grid = QGridLayout()
+        links = [
+            ("Centre de protection", "protectos-logo", "protectos-protection"),
+            ("Paramètres du système", "configure", "systemsettings"),
+            ("Discover", "plasmadiscover", "plasma-discover"),
+            ("Programmes et fonctionnalités", "protectos-logo", "protectos-programmes"),
+            ("Explorateur de fichiers", "system-file-manager", "dolphin"),
+        ]
+        for i, (name, icon, cmd) in enumerate(links):
+            b = QPushButton(QIcon.fromTheme(icon), name)
+            b.clicked.connect(lambda _c=False, c=cmd: self.launch(c))
+            grid.addWidget(b, i // 2, i % 2)
+        return self.page("C'est prêt !",
+                         para("protect.OS est réglé. Vous pouvez rouvrir cet assistant à tout moment depuis "
+                              "le menu Démarrer : « Bienvenue dans protect.OS »."),
+                         grid)
+
+
+def main():
+    if "--premier-demarrage" in sys.argv and vb.first_run_done() and not vb.is_live():
+        return 0
+    app = QApplication(sys.argv)
+    app.setApplicationName("Bienvenue dans protect.OS")
+    app.setDesktopFileName("protectos-bienvenue")
+    w = Bienvenue()
+    w.show()
+    return app.exec()
+
+
+if __name__ == "__main__":
+    sys.exit(main())

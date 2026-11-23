@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Contrôle parental
+Comment=Temps d'écran, horaires et filtrage des sites pour les comptes enfants
+Exec=protectos-parental
+Icon=protectos-logo
+Terminal=false
+Categories=Qt;Settings;Security;System;
+Keywords=parental;enfant;enfants;temps d'écran;horaires;filtre;sites;famille;

@@ -1,0 +1,6 @@
+// protect.OS : mises à jour de sécurité automatiques.
+// Chaque jour, APT rafraîchit la liste des paquets et installe les correctifs
+// de sécurité de Debian et les mises à jour de protect.OS, en arrière-plan.
+APT::Periodic::Update-Package-Lists "1";
+APT::Periodic::Unattended-Upgrade "1";
+APT::Periodic::AutocleanInterval "7";

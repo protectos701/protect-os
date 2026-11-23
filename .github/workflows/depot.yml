@@ -1,0 +1,87 @@
+# Construit les paquets protect.OS et publie le dépôt de mises à jour sur GitHub Pages.
+# Se lance à chaque modification des paquets, et à la demande (onglet Actions).
+name: Paquets, dépôt et site
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "packages/**"
+      - "tools/**"
+      - "keys/**"
+      - "apps/**"
+      - "site/**"
+      - "ma-personnalisation.conf"
+      - "personnalisation/**"
+      - "VERSION"
+      - "protectos.conf"
+      - ".github/workflows/depot.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  paquets:
+    runs-on: ubuntu-latest
+    container: debian:trixie
+    steps:
+      - name: Outils
+        run: apt-get update && apt-get install -y --no-install-recommends dpkg-dev gnupg python3 python3-pil librsvg2-bin fonts-dejavu-core ca-certificates git
+
+      - uses: actions/checkout@v4
+
+      - name: Adresse du dépôt
+        shell: bash
+        run: |
+          owner="${GITHUB_REPOSITORY_OWNER,,}"
+          repo="${GITHUB_REPOSITORY#*/}"
+          if [ "$repo" = "$owner.github.io" ]; then url="https://$owner.github.io"; else url="https://$owner.github.io/$repo"; fi
+          echo "REPO_URL=$url" >> "$GITHUB_ENV"
+          echo "Dépôt publié à : $url"
+
+      - name: Appliquer ma-personnalisation.conf
+        run: python3 tools/personnaliser.py
+
+      - name: Construire les paquets
+        run: sh tools/build-debs.sh
+
+      - name: Créer et signer le dépôt
+        env:
+          PROTECTOS_GPG_PRIVATE_KEY: ${{ secrets.PROTECTOS_GPG_PRIVATE_KEY }}
+        shell: bash
+        run: |
+          if [ -z "$PROTECTOS_GPG_PRIVATE_KEY" ]; then
+            echo "::error::Le secret PROTECTOS_GPG_PRIVATE_KEY manque (voir README, « Dépôt de mises à jour »)."
+            exit 1
+          fi
+          export GNUPGHOME="$(mktemp -d)"
+          echo "$PROTECTOS_GPG_PRIVATE_KEY" | gpg --batch --import
+          KEY=$(gpg --list-secret-keys --with-colons | awk -F: '/^sec/{print $5; exit}')
+          python3 tools/make-repo.py --key "$KEY"
+          touch repo/.nojekyll
+
+      - name: Ajouter le site de protect.OS
+        run: |
+          cp -r site/. repo/
+          sed -i "s|__GITHUB_REPO__|$GITHUB_REPOSITORY|" repo/index.html
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: repo
+
+  publier:
+    needs: paquets
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploiement.outputs.page_url }}
+    steps:
+      - id: deploiement
+        uses: actions/deploy-pages@v4

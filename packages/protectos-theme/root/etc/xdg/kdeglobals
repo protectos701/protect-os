@@ -1,0 +1,10 @@
+[General]
+ColorScheme=ProtectBleuOr
+AccentColor=212,167,44
+
+[KDE]
+LookAndFeelPackage=org.protectos.desktop
+widgetStyle=Breeze
+
+[Icons]
+Theme=breeze-dark

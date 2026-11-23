@@ -1,0 +1,8 @@
+[Plymouth Theme]
+Name=protect.OS
+Description=Écran de démarrage bleu et or de protect.OS
+ModuleName=script
+
+[script]
+ImageDir=/usr/share/plymouth/themes/protectos
+ScriptFile=/usr/share/plymouth/themes/protectos/protectos.script

@@ -1,0 +1,104 @@
+# Construit l'ISO de protect.OS.
+# - À la demande (onglet Actions → « Image ISO » → Run workflow) : l'ISO est téléchargeable dans les artefacts.
+# - Quand on pousse une étiquette de version (ex. v1.0.0) : une « Release » GitHub est créée avec l'ISO.
+name: Image ISO
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  iso:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - name: Libérer de l'espace disque
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache /usr/local/share/boost
+          sudo docker image prune --all --force
+          df -h /
+
+      - uses: actions/checkout@v4
+
+      - name: Adresse du dépôt
+        shell: bash
+        run: |
+          owner="${GITHUB_REPOSITORY_OWNER,,}"
+          repo="${GITHUB_REPOSITORY#*/}"
+          if [ "$repo" = "$owner.github.io" ]; then url="https://$owner.github.io"; else url="https://$owner.github.io/$repo"; fi
+          echo "REPO_URL=$url" >> "$GITHUB_ENV"
+
+      - name: Construire l'ISO (Debian 13 dans Docker)
+        run: |
+          sudo docker run --rm --privileged \
+            -e REPO_URL="$REPO_URL" \
+            -v "$PWD":/protectos -w /protectos debian:trixie \
+            sh -c "apt-get update && apt-get install -y --no-install-recommends live-build dpkg-dev gnupg python3 python3-pil librsvg2-bin fonts-dejavu-core ca-certificates && python3 tools/personnaliser.py && ./build.sh"
+          sudo chown -R "$(id -u):$(id -g)" .
+
+      - name: Sommes de contrôle et découpage
+        shell: bash
+        run: |
+          ISO=$(ls -1 protect-os*.iso | head -n 1)
+          mkdir -p iso dist
+          mv "$ISO" iso/
+          cd dist
+          (cd ../iso && sha256sum "$ISO") > SHA256SUMS
+          # GitHub limite chaque fichier d'une Release à 2 Go : on découpe si besoin.
+          if [ "$(stat -c %s "../iso/$ISO")" -gt 2000000000 ]; then
+            split -b 1900M -d "../iso/$ISO" "$ISO.part"
+            sha256sum "$ISO".part* >> SHA256SUMS
+            parts=$(ls -1 "$ISO".part* | paste -sd+)
+            {
+              echo "L'ISO est découpée en plusieurs morceaux. Téléchargez-les tous, puis reconstituez-la :"
+              echo "  Linux / macOS : cat $ISO.part* > $ISO"
+              echo "  Windows (invite de commandes) : copy /b $parts $ISO"
+              echo "Vérifiez ensuite l'ISO : sha256sum -c SHA256SUMS  (la ligne de l'ISO doit afficher OK)"
+            } > LISEZMOI-ISO.txt
+          else
+            cp "../iso/$ISO" .
+          fi
+          ls -lh
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: protect-os-iso
+          path: iso/*.iso
+          retention-days: 7
+          compression-level: 0
+
+      - name: Activer l'accélération matérielle (KVM)
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+          ls -l /dev/kvm || echo "KVM indisponible : le test sera plus lent"
+
+      # Démarre l'ISO dans une machine virtuelle, vérifie que le bureau s'ouvre et prend des captures.
+      # Si le bureau ne démarre pas, la version n'est pas publiée.
+      - name: Tester l'ISO (démarrage et captures d'écran)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends qemu-system-x86 xorriso python3-pil
+          python3 tools/test-iso.py iso/*.iso -o captures
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: captures-ecran
+          path: captures/
+          retention-days: 30
+
+      - name: Publier la version
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          name: protect.OS ${{ github.ref_name }}
+          generate_release_notes: true
+          files: |
+            dist/*
+            captures/final.png

@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Installateur protect.OS
+Comment=Installer un programme Windows (.exe, .msi) ou un paquet (.deb)
+Exec=protectos-installer %f
+Icon=protectos-logo
+Terminal=false
+NoDisplay=true
+Categories=System;
+MimeType=application/x-ms-dos-executable;application/x-msdownload;application/vnd.microsoft.portable-executable;application/x-msi;application/x-ms-installer;application/vnd.debian.binary-package;

@@ -1,0 +1,14 @@
+Package: protectos-bienvenue
+Version: @VERSION@
+Architecture: all
+Maintainer: @MAINTAINER@
+Section: admin
+Priority: optional
+Depends: python3, python3-pyqt6, pciutils, pkexec | policykit-1, protectos-theme (= @VERSION@)
+Recommends: mokutil
+Description: Assistant « Bienvenue dans protect.OS »
+ S'ouvre au premier démarrage de protect.OS pour régler le système en
+ quelques minutes : thème clair ou sombre, pilote NVIDIA, sauvegardes
+ Timeshift, applications populaires (Steam, GIMP, Krita…), et découverte
+ de l'installation des programmes Windows. Dans la session d'essai, il
+ propose aussi d'installer protect.OS.

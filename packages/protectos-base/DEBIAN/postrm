@@ -1,0 +1,10 @@
+#!/bin/sh
+set -e
+# Rend son identité d'origine à Debian si le paquet est retiré.
+case "$1" in
+	remove|abort-install|disappear)
+		dpkg-divert --package protectos-base --remove --rename \
+			--divert /usr/lib/os-release.debian /usr/lib/os-release
+		;;
+esac
+exit 0

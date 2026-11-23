@@ -1,0 +1,33 @@
+# Produits de construction
+build/
+repo/
+config/packages.chroot/*.deb
+tools/build/
+
+# Fichiers générés par live-build
+.build/
+cache/
+chroot/
+binary/
+chroot.*
+binary.*
+*.iso
+*.iso.part*
+*.contents
+*.files
+*.packages
+build.log
+config/binary
+config/bootstrap
+config/chroot
+config/common
+config/source
+
+# Ne jamais publier la clé privée
+keys/*.key
+keys/*private*
+*.gpg~
+
+# Python
+__pycache__/
+*.pyc

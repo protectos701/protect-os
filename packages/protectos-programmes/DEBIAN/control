@@ -1,0 +1,19 @@
+Package: protectos-programmes
+Version: @VERSION@
+Architecture: all
+Maintainer: @MAINTAINER@
+Section: admin
+Priority: optional
+Depends: python3, python3-pyqt6, wine, icoutils, pkexec | policykit-1
+Recommends: python3-pefile, fonts-wine, winetricks
+Description: Installation des programmes Windows et protect.OS, façon Windows
+ Installateur protect.OS : un double-clic sur un .exe, un .msi ou un .deb
+ l'installe, comme sous Windows (disque C:, Program Files, raccourcis du
+ menu Démarrer). « Programmes et fonctionnalités » liste et désinstalle les
+ programmes Windows, les programmes portables et les applications protect.OS.
+ .
+ L'installateur repère aussi les composants dont un programme a besoin
+ (.NET Framework, Visual C++, DirectX 9) et propose de les ajouter.
+ .
+ Comprend aussi protectos-pack, qui transforme un dossier de programme (Linux
+ ou .exe Windows) en paquet installable avec raccourci et icône.

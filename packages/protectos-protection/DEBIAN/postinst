@@ -1,0 +1,13 @@
+#!/bin/sh
+set -e
+if [ "$1" = "configure" ]; then
+	# Mise à jour hebdomadaire du bloqueur de publicités
+	if command -v deb-systemd-helper >/dev/null 2>&1; then
+		deb-systemd-helper enable protectos-bloqueur.timer >/dev/null || true
+	fi
+	if [ -d /run/systemd/system ]; then
+		systemctl daemon-reload >/dev/null 2>&1 || true
+		systemctl start protectos-bloqueur.timer >/dev/null 2>&1 || true
+	fi
+fi
+exit 0

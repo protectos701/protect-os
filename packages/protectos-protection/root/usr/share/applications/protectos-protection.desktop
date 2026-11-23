@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Centre de protection
+GenericName=Sécurité de l'ordinateur
+Comment=Vérifier et corriger la protection : pare-feu, mises à jour, sauvegardes, chiffrement
+Exec=protectos-protection
+Icon=protectos-logo
+Terminal=false
+Categories=Qt;Settings;Security;System;
+Keywords=sécurité;protection;pare-feu;antivirus;mises à jour;sauvegarde;chiffrement;

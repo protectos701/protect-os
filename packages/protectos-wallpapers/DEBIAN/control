@@ -1,0 +1,9 @@
+Package: protectos-wallpapers
+Version: @VERSION@
+Architecture: all
+Maintainer: @MAINTAINER@
+Section: graphics
+Priority: optional
+Description: Fonds d'écran de protect.OS
+ Le fond d'écran « protect.OS Bleu et Or » : un vitrail bleu nuit serti de
+ plomb doré, en résolution 4K et Full HD.

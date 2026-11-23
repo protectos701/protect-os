@@ -1,0 +1,49 @@
+{
+  "policies": {
+    "DisableTelemetry": true,
+    "DisableFirefoxStudies": true,
+    "DisablePocket": true,
+    "DontCheckDefaultBrowser": true,
+    "EnableTrackingProtection": {
+      "Value": true,
+      "Locked": false,
+      "Cryptomining": true,
+      "Fingerprinting": true,
+      "EmailTracking": true
+    },
+    "HttpsOnlyMode": "enabled",
+    "FirefoxHome": {
+      "SponsoredTopSites": false,
+      "SponsoredPocket": false,
+      "Pocket": false,
+      "Locked": false
+    },
+    "FirefoxSuggest": {
+      "SponsoredSuggestions": false,
+      "ImproveSuggest": false,
+      "Locked": false
+    },
+    "UserMessaging": {
+      "ExtensionRecommendations": false,
+      "FeatureRecommendations": false,
+      "SkipOnboarding": true,
+      "MoreFromMozilla": false,
+      "Locked": false
+    },
+    "SearchEngines": {
+      "Default": "DuckDuckGo"
+    },
+    "ExtensionSettings": {
+      "uBlock0@raymondhill.net": {
+        "installation_mode": "normal_installed",
+        "install_url": "https://addons.mozilla.org/firefox/downloads/latest/ublock-origin/latest.xpi"
+      }
+    },
+    "Preferences": {
+      "privacy.globalprivacycontrol.enabled": {
+        "Value": true,
+        "Status": "default"
+      }
+    }
+  }
+}

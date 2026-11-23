@@ -1,0 +1,17 @@
+Package: protectos-protection
+Version: @VERSION@
+Architecture: all
+Maintainer: @MAINTAINER@
+Section: admin
+Priority: optional
+Depends: python3, python3-pyqt6, pkexec | policykit-1, libnotify-bin, util-linux, curl
+Recommends: clamav, clamav-freshclam, inotify-tools, ufw, unattended-upgrades, timeshift, mokutil, plasma-firewall
+Description: Centre de protection de protect.OS
+ Montre d'un coup d'œil si l'ordinateur est protégé : antivirus, pare-feu, mises à
+ jour de sécurité automatiques, sauvegardes, chiffrement du disque,
+ démarrage sécurisé et verrouillage de l'écran. Les problèmes se corrigent
+ en un clic. Une vérification discrète a lieu à chaque ouverture de session
+ et prévient par une notification en cas de problème.
+ .
+ Comprend un antivirus (moteur ClamAV) : surveillance des téléchargements,
+ analyse à la demande ou par clic droit, quarantaine des fichiers dangereux.

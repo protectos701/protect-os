@@ -1,0 +1,5 @@
+Placez ici la clé PUBLIQUE du dépôt protect.OS, sous le nom protectos-archive.asc
+(voir README, section 3 « Mettre en place le dépôt de mises à jour »).
+
+Ne mettez JAMAIS la clé privée dans ce dossier : elle va uniquement dans le
+secret GitHub PROTECTOS_GPG_PRIVATE_KEY, et dans une sauvegarde hors ligne.

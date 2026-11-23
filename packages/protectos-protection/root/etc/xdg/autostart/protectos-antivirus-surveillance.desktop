@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=Surveillance antivirus des téléchargements
+Exec=protectos-antivirus surveiller
+Icon=protectos-logo
+OnlyShowIn=KDE;
+NoDisplay=true

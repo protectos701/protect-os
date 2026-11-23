@@ -1,0 +1,9 @@
+#!/bin/sh
+set -e
+if [ "$1" = "configure" ] && command -v plymouth-set-default-theme >/dev/null 2>&1; then
+	plymouth-set-default-theme protectos || true
+	if command -v update-initramfs >/dev/null 2>&1; then
+		update-initramfs -u || true
+	fi
+fi
+exit 0

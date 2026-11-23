@@ -1,0 +1,15 @@
+#!/bin/sh
+set -e
+if [ "$1" = "remove" ] || [ "$1" = "purge" ]; then
+	# Retire la liste de blocage de /etc/hosts
+	if [ -f /etc/hosts ]; then
+		sed -i '\|^# >>> protect.OS : bloqueur|,\|^# <<< protect.OS : fin du bloqueur <<<$|d' /etc/hosts
+	fi
+	if command -v deb-systemd-helper >/dev/null 2>&1; then
+		deb-systemd-helper purge protectos-bloqueur.timer >/dev/null || true
+	fi
+fi
+if [ "$1" = "purge" ]; then
+	rm -rf /var/lib/protectos/bloqueur
+fi
+exit 0

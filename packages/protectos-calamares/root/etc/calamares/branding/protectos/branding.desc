@@ -1,0 +1,36 @@
+---
+# Identité de protect.OS dans l'installateur Calamares
+componentName: protectos
+
+welcomeStyleCalamares: false
+welcomeExpandingLogo: true
+
+windowExpanding: normal
+windowSize: 960px,640px
+windowPlacement: center
+
+sidebar: widget
+navigation: widget
+
+strings:
+    productName:         protect.OS
+    shortProductName:    protect.OS
+    version:             1.0
+    shortVersion:        1.0
+    versionedName:       protect.OS 1.0
+    shortVersionedName:  protect.OS 1.0
+    bootloaderEntryName: protect.OS
+
+images:
+    productLogo:         "logo.png"
+    productIcon:         "logo.png"
+    productWelcome:      "welcome.png"
+
+slideshow:               "show.qml"
+slideshowAPI:            2
+
+style:
+   SidebarBackground:        "#0a1a52"
+   SidebarText:              "#f3e3b0"
+   SidebarTextCurrent:       "#1a1405"
+   SidebarBackgroundCurrent: "#d4a72c"

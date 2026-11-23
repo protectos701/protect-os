@@ -1,0 +1,18 @@
+#!/bin/sh
+# En session d'essai uniquement : place l'icône « Installer protect.OS » sur le bureau.
+grep -qw "boot=live" /proc/cmdline || exit 0
+
+SRC=""
+for f in /usr/share/applications/install-protectos.desktop \
+	/usr/share/applications/install-debian.desktop \
+	/usr/share/applications/calamares.desktop; do
+	[ -f "$f" ] && SRC="$f" && break
+done
+[ -n "$SRC" ] || exit 0
+
+DESK=$(xdg-user-dir DESKTOP 2>/dev/null || echo "$HOME/Desktop")
+mkdir -p "$DESK"
+DEST="$DESK/installer-protect-os.desktop"
+[ -f "$DEST" ] && exit 0
+cp "$SRC" "$DEST"
+chmod +x "$DEST"

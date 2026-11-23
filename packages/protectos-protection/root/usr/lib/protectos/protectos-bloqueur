@@ -1,0 +1,105 @@
+#!/bin/sh
+# Bloqueur de publicités et de traqueurs de protect.OS, pour tout le système.
+#
+# Il ajoute à /etc/hosts une liste publique de domaines publicitaires et de pistage
+# (liste « unifiée » de Steven Black, mise à jour chaque semaine) : ces domaines ne
+# mènent plus nulle part, dans toutes les applications. La partie de /etc/hosts écrite
+# par vous ou par le système n'est jamais modifiée.
+#
+#   protectos-bloqueur mettre-a-jour   télécharge la liste et l'applique (si le bloqueur est activé)
+#   protectos-bloqueur activer         active le bloqueur (et le met à jour)
+#   protectos-bloqueur desactiver      retire la liste de /etc/hosts
+#   protectos-bloqueur etat            affiche l'état
+set -e
+
+HOSTS="${PROTECTOS_HOSTS:-/etc/hosts}"
+CONF="${PROTECTOS_CONF:-/etc/protectos/vie-privee.conf}"
+DIR="${PROTECTOS_BLOQUEUR_DIR:-/var/lib/protectos/bloqueur}"
+URL="${PROTECTOS_BLOQUEUR_URL:-https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts}"
+DEBUT="# >>> protect.OS : bloqueur de publicités et de traqueurs (ne pas modifier) >>>"
+FIN="# <<< protect.OS : fin du bloqueur <<<"
+
+actif() { grep -qx "BLOQUEUR=oui" "$CONF" 2>/dev/null; }
+
+regler() {
+	mkdir -p "$(dirname "$CONF")"
+	if grep -q "^BLOQUEUR=" "$CONF" 2>/dev/null; then
+		sed -i "s/^BLOQUEUR=.*/BLOQUEUR=$1/" "$CONF"
+	else
+		echo "BLOQUEUR=$1" >> "$CONF"
+	fi
+}
+
+# /etc/hosts sans notre bloc
+hosts_propre() { sed "\|^$DEBUT\$|,\|^$FIN\$|d" "$HOSTS"; }
+
+retirer() {
+	tmp=$(mktemp)
+	hosts_propre > "$tmp"
+	cat "$tmp" > "$HOSTS"
+	rm -f "$tmp"
+}
+
+telecharger() {
+	mkdir -p "$DIR"
+	brut=$(mktemp)
+	if command -v curl >/dev/null 2>&1; then
+		curl -fsSL --max-time 120 "$URL" -o "$brut"
+	else
+		wget -q -T 120 -O "$brut" "$URL"
+	fi
+	# On ne garde que des lignes « 0.0.0.0 domaine » bien formées (sécurité)
+	grep -E '^0\.0\.0\.0 [A-Za-z0-9._-]+$' "$brut" | grep -v '^0\.0\.0\.0 0\.0\.0\.0$' | sort -u > "$DIR/liste.tmp"
+	rm -f "$brut"
+	n=$(wc -l < "$DIR/liste.tmp")
+	if [ "$n" -lt 10000 ]; then
+		echo "Liste téléchargée trop courte ($n domaines) : ancienne liste conservée." >&2
+		rm -f "$DIR/liste.tmp"
+		return 1
+	fi
+	mv "$DIR/liste.tmp" "$DIR/liste"
+}
+
+appliquer() {
+	[ -f "$DIR/liste" ] || return 0
+	tmp=$(mktemp)
+	hosts_propre > "$tmp"
+	{
+		echo "$DEBUT"
+		echo "# $(wc -l < "$DIR/liste") domaines, liste du $(date -r "$DIR/liste" +%Y-%m-%d)"
+		cat "$DIR/liste"
+		echo "$FIN"
+	} >> "$tmp"
+	cat "$tmp" > "$HOSTS"
+	rm -f "$tmp"
+}
+
+case "${1:-etat}" in
+	mettre-a-jour)
+		actif || { retirer; exit 0; }
+		telecharger || true
+		appliquer
+		;;
+	activer)
+		regler oui
+		telecharger || true
+		appliquer
+		;;
+	desactiver)
+		regler non
+		retirer
+		;;
+	etat)
+		if actif && grep -qx "$DEBUT" "$HOSTS"; then
+			echo "actif $(sed -n "\|^$DEBUT\$|,\|^$FIN\$|p" "$HOSTS" | grep -c '^0\.0\.0\.0 ')"
+		elif actif; then
+			echo "en-attente"
+		else
+			echo "inactif"
+		fi
+		;;
+	*)
+		echo "Usage : $0 mettre-a-jour | activer | desactiver | etat" >&2
+		exit 2
+		;;
+esac

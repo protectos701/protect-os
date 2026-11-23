@@ -1,0 +1,2 @@
+Placez ici les paquets .deb de vos propres programmes (faits avec protectos-pack).
+Ils seront publiés dans le dépôt protect.OS avec les paquets du système.

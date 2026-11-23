@@ -1,0 +1,15 @@
+[Default Applications]
+application/x-ms-dos-executable=protectos-installer.desktop
+application/x-msdownload=protectos-installer.desktop
+application/vnd.microsoft.portable-executable=protectos-installer.desktop
+application/x-msi=protectos-installer.desktop
+application/x-ms-installer=protectos-installer.desktop
+application/vnd.debian.binary-package=protectos-installer.desktop
+
+[Added Associations]
+application/x-ms-dos-executable=protectos-installer.desktop;
+application/x-msdownload=protectos-installer.desktop;
+application/vnd.microsoft.portable-executable=protectos-installer.desktop;
+application/x-msi=protectos-installer.desktop;
+application/x-ms-installer=protectos-installer.desktop;
+application/vnd.debian.binary-package=protectos-installer.desktop;

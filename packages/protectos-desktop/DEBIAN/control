@@ -1,0 +1,15 @@
+Package: protectos-desktop
+Version: @VERSION@
+Architecture: all
+Maintainer: @MAINTAINER@
+Section: metapackages
+Priority: optional
+Depends: protectos-base (= @VERSION@), protectos-theme (= @VERSION@), protectos-wallpapers (= @VERSION@), protectos-plymouth (= @VERSION@), protectos-programmes (= @VERSION@), protectos-bienvenue (= @VERSION@), protectos-protection (= @VERSION@), protectos-parental (= @VERSION@), kde-plasma-desktop, sddm, plasma-nm, plasma-pa, xdg-user-dirs
+Recommends: protectos-archive-keyring, timeshift, plasma-discover, plasma-systemmonitor, dolphin, konsole, kate, ark, gwenview, okular, kcalc, kde-spectacle, partitionmanager, firefox-esr, libreoffice-writer, libreoffice-calc, libreoffice-impress, vlc, network-manager, fonts-noto, fonts-noto-color-emoji, cups, print-manager, printer-driver-gutenprint, hplip, system-config-printer-common, skanlite, sane-utils, flatpak, plasma-discover-backend-flatpak, unattended-upgrades, ufw, plasma-firewall, systemd-zram-generator, power-profiles-daemon
+Description: Bureau complet de protect.OS
+ Installe le bureau KDE Plasma avec le thème bleu et or de protect.OS et
+ les applications de base : navigateur, bureautique, multimédia, fichiers.
+ Il ajoute aussi l'impression et la numérisation, les applications Flathub
+ dans Discover, le pare-feu, les mises à jour de sécurité automatiques et
+ la compression de la mémoire pour les ordinateurs modestes.
+ Ce paquet fait suivre à votre système les nouvelles versions de protect.OS.

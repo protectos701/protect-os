@@ -1,0 +1,227 @@
+#!/usr/bin/python3
+"""Contrôle parental de protect.OS : choisir les comptes enfants et leurs limites.
+
+  protectos-parental           ouvre la fenêtre de réglage
+  protectos-parental --temps   affiche le temps d'écran restant aujourd'hui (pour le compte courant)
+"""
+import datetime
+import getpass
+import json
+import os
+import sys
+import tempfile
+
+sys.path.insert(0, "/usr/lib/protectos")
+import protectos_parental as pc  # noqa: E402
+
+if "--temps" in sys.argv:
+    moi = getpass.getuser()
+    regle = pc.charger()["enfants"].get(moi)
+    if not regle:
+        print("Aucune limite pour ce compte.")
+    else:
+        _a, restantes, raison = pc.decision(regle, datetime.datetime.now(), pc.minutes_utilisees(moi))
+        print(raison.capitalize() + "." if raison else f"Il te reste {restantes} minutes aujourd'hui "
+              f"(autorisé de {regle['debut']} à {regle['fin']}).")
+    sys.exit(0)
+
+from PyQt6.QtCore import QProcess, Qt, QTime  # noqa: E402
+from PyQt6.QtGui import QFont, QIcon  # noqa: E402
+from PyQt6.QtWidgets import (  # noqa: E402
+    QApplication, QCheckBox, QFrame, QGridLayout, QHBoxLayout, QLabel, QPushButton, QScrollArea, QSpinBox,
+    QTimeEdit, QVBoxLayout, QWidget)
+
+OR = "#d4a72c"
+STYLE = f"""
+#banniere {{ background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #16307a, stop:1 #060f2e);
+            border-bottom: 2px solid {OR}; }}
+#banniere QLabel {{ color: #eef2fb; }}
+QFrame#carte {{ border: 1px solid rgba(212,167,44,0.35); border-radius: 10px; }}
+QPushButton#principal {{ background: {OR}; color: #1a1405; border: none; border-radius: 6px;
+                         padding: 8px 18px; font-weight: bold; }}
+"""
+
+
+class Parental(QWidget):
+    def __init__(self):
+        super().__init__()
+        self.setWindowTitle("Contrôle parental")
+        self.setWindowIcon(QIcon.fromTheme("protectos-logo"))
+        self.setStyleSheet(STYLE)
+        self.resize(720, 620)
+        self.proc = None
+        self.lignes = {}
+
+        banner = QWidget()
+        banner.setObjectName("banniere")
+        bl = QHBoxLayout(banner)
+        bl.setContentsMargins(24, 16, 24, 16)
+        logo = QLabel()
+        logo.setPixmap(QIcon.fromTheme("protectos-logo").pixmap(56, 56))
+        titre = QLabel("Contrôle parental")
+        f = QFont(titre.font())
+        f.setPointSizeF(f.pointSizeF() * 1.6)
+        f.setBold(True)
+        titre.setFont(f)
+        sous = QLabel("Temps d'écran, horaires et filtrage des sites pour les comptes de vos enfants.")
+        sous.setWordWrap(True)
+        tv = QVBoxLayout()
+        tv.addWidget(titre)
+        tv.addWidget(sous)
+        bl.addWidget(logo)
+        bl.addSpacing(10)
+        bl.addLayout(tv, 1)
+
+        self.liste = QVBoxLayout()
+        self.liste.setSpacing(10)
+        host = QWidget()
+        hv = QVBoxLayout(host)
+        hv.setContentsMargins(20, 16, 20, 16)
+        hv.addLayout(self.liste)
+        hv.addStretch(1)
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.Shape.NoFrame)
+        scroll.setWidget(host)
+
+        creer = QPushButton(QIcon.fromTheme("list-add-user"), "Créer un compte…")
+        creer.clicked.connect(lambda: QProcess.startDetached("systemsettings", ["kcm_users"]))
+        actualiser = QPushButton(QIcon.fromTheme("view-refresh"), "Actualiser")
+        actualiser.clicked.connect(self.remplir)
+        self.sauver = QPushButton(QIcon.fromTheme("document-save"), "Enregistrer")
+        self.sauver.setObjectName("principal")
+        self.sauver.clicked.connect(self.enregistrer)
+        self.message = QLabel("")
+        self.message.setWordWrap(True)
+        bas = QHBoxLayout()
+        bas.addWidget(creer)
+        bas.addWidget(actualiser)
+        bas.addStretch(1)
+        bas.addWidget(self.sauver)
+        pied = QVBoxLayout()
+        pied.setContentsMargins(20, 0, 20, 14)
+        pied.addWidget(self.message)
+        pied.addLayout(bas)
+
+        lay = QVBoxLayout(self)
+        lay.setContentsMargins(0, 0, 0, 0)
+        lay.addWidget(banner)
+        lay.addWidget(scroll, 1)
+        lay.addLayout(pied)
+        self.remplir()
+
+    def remplir(self):
+        while self.liste.count():
+            w = self.liste.takeAt(0).widget()
+            if w:
+                w.deleteLater()
+        self.lignes = {}
+        reglages = pc.charger()["enfants"]
+        comptes = pc.comptes()
+        standards = [u for u in comptes if not u["admin"]]
+        if not standards:
+            info = QLabel("Il n'y a encore aucun compte standard sur cet ordinateur. Créez d'abord un compte "
+                          "pour votre enfant (bouton « Créer un compte… », type « Standard »), puis revenez ici.")
+            info.setWordWrap(True)
+            self.liste.addWidget(info)
+        for u in comptes:
+            self.liste.addWidget(self.carte(u, reglages.get(u["login"])))
+
+    def carte(self, u, regle):
+        fr = QFrame()
+        fr.setObjectName("carte")
+        g = QGridLayout(fr)
+        g.setContentsMargins(14, 12, 14, 12)
+        nom = QLabel(f"<b>{u['nom']}</b> &nbsp;<span style='color:gray'>({u['login']})</span>")
+        g.addWidget(nom, 0, 0, 1, 4)
+        if u["admin"]:
+            g.addWidget(QLabel("Administrateur : ne peut pas être un compte enfant."), 1, 0, 1, 4)
+            return fr
+        r = regle or pc.defaut_enfant()
+        enfant = QCheckBox("Compte enfant")
+        enfant.setChecked(regle is not None)
+        temps = QSpinBox()
+        temps.setRange(0, 1440)
+        temps.setSingleStep(15)
+        temps.setSuffix(" min par jour")
+        temps.setSpecialValueText("Sans limite de temps")
+        temps.setValue(r["minutes_par_jour"])
+        debut, fin = QTimeEdit(), QTimeEdit()
+        debut.setDisplayFormat("HH:mm")
+        fin.setDisplayFormat("HH:mm")
+        debut.setTime(QTime.fromString(r["debut"], "HH:mm"))
+        fin.setTime(QTime.fromString(r["fin"], "HH:mm"))
+        filtre = QCheckBox("Filtrer les sites inadaptés (contenus pour adultes, sites malveillants)")
+        filtre.setChecked(r["filtre"])
+        utilise = pc.minutes_utilisees(u["login"])
+        aujourdhui = QLabel(f"Aujourd'hui : {pc._duree(utilise)} utilisées" if regle else "")
+        horaires = QHBoxLayout()
+        horaires.addWidget(QLabel("Autorisé de"))
+        horaires.addWidget(debut)
+        horaires.addWidget(QLabel("à"))
+        horaires.addWidget(fin)
+        horaires.addStretch(1)
+        g.addWidget(enfant, 1, 0)
+        g.addWidget(temps, 1, 1)
+        g.addWidget(aujourdhui, 1, 2, 1, 2)
+        g.addLayout(horaires, 2, 0, 1, 4)
+        g.addWidget(filtre, 3, 0, 1, 4)
+        reglables = (temps, debut, fin, filtre)
+        for w in reglables:
+            w.setEnabled(enfant.isChecked())
+        enfant.toggled.connect(lambda on: [w.setEnabled(on) for w in reglables])
+        self.lignes[u["login"]] = (enfant, temps, debut, fin, filtre)
+        return fr
+
+    def collecter(self):
+        enfants = {}
+        for login, (enfant, temps, debut, fin, filtre) in self.lignes.items():
+            if enfant.isChecked():
+                enfants[login] = {"minutes_par_jour": temps.value(), "debut": debut.time().toString("HH:mm"),
+                                  "fin": fin.time().toString("HH:mm"), "filtre": filtre.isChecked()}
+        return {"enfants": enfants}
+
+    def enregistrer(self):
+        if self.proc:
+            return
+        data = self.collecter()
+        try:
+            data = pc.valider(data)
+        except ValueError as e:
+            self.message.setText(f"<b style='color:#d9534f'>{e}</b>")
+            return
+        fd, chemin = tempfile.mkstemp(prefix="parental-", suffix=".json")
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False)
+        os.chmod(chemin, 0o644)
+        self.message.setText("Enregistrement… Saisissez le mot de passe administrateur.")
+        self.sauver.setEnabled(False)
+        self.proc = QProcess(self)
+
+        def fini(code):
+            self.proc = None
+            self.sauver.setEnabled(True)
+            os.remove(chemin)
+            n = len(data["enfants"])
+            self.message.setText(
+                (f"<b>Enregistré.</b> Contrôle parental actif pour {n} compte{'s' if n > 1 else ''}."
+                 if n else "<b>Enregistré.</b> Aucun compte enfant.") if code == 0 else
+                "Annulé." if code in (126, 127) else "L'enregistrement n'a pas abouti.")
+            self.remplir()
+
+        self.proc.finished.connect(lambda code, _s: fini(code))
+        self.proc.errorOccurred.connect(lambda e: fini(-1) if e == QProcess.ProcessError.FailedToStart else None)
+        self.proc.start("pkexec", ["/usr/lib/protectos/protectos-parental-root", "enregistrer", chemin])
+
+
+def main():
+    app = QApplication(sys.argv)
+    app.setApplicationName("Contrôle parental")
+    app.setDesktopFileName("protectos-parental")
+    w = Parental()
+    w.show()
+    return app.exec()
+
+
+if __name__ == "__main__":
+    sys.exit(main())

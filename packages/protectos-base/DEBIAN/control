@@ -1,0 +1,13 @@
+Package: protectos-base
+Version: @VERSION@
+Architecture: all
+Maintainer: @MAINTAINER@
+Section: misc
+Priority: optional
+Depends: base-files
+Recommends: xdg-user-dirs, ufw, unattended-upgrades, systemd-zram-generator
+Description: Identité et réglages de base de protect.OS
+ Donne au système le nom « protect.OS » (fichier os-release), règle le menu
+ de démarrage GRUB et ajoute l'icône d'installation en session d'essai.
+ Active aussi le pare-feu, les mises à jour de sécurité automatiques et la
+ mémoire compressée (zram).

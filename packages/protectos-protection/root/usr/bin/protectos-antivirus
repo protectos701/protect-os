@@ -1,0 +1,80 @@
+#!/usr/bin/python3
+"""Antivirus de protect.OS en ligne de commande.
+
+  protectos-antivirus analyser CHEMIN...   analyse et met les menaces en quarantaine
+  protectos-antivirus surveiller           surveille le dossier Téléchargements (lancé à l'ouverture de session)
+  protectos-antivirus quarantaine          liste les fichiers en quarantaine
+"""
+import os
+import shutil
+import subprocess
+import sys
+import time
+
+sys.path.insert(0, "/usr/lib/protectos")
+import protectos_antivirus as av  # noqa: E402
+
+
+def notifier(titre, texte, urgent=False):
+    if shutil.which("notify-send"):
+        subprocess.run(["notify-send", "-a", "protect.OS", "-i", "protectos-logo",
+                        "-u", "critical" if urgent else "normal", titre, texte])
+    print(f"{titre} : {texte}")
+
+
+def analyser(paths):
+    if not av.ready():
+        print("L'antivirus n'est pas prêt (ClamAV absent ou signatures pas encore téléchargées).", file=sys.stderr)
+        return 2
+    menaces, erreur = av.scan_and_quarantine(paths)
+    for m in menaces:
+        notifier("Menace bloquée", f"« {m['nom']} » contenait {m['menace']}. Le fichier a été mis en quarantaine.", True)
+    if erreur:
+        print("Erreur de l'analyse : " + erreur, file=sys.stderr)
+    if not menaces:
+        print("Aucune menace trouvée.")
+    return 1 if menaces else 0
+
+
+def surveiller():
+    """Analyse chaque fichier à risque qui arrive dans Téléchargements."""
+    dossier = av.downloads_dir()
+    if not dossier or not av.available() or not shutil.which("inotifywait"):
+        return 0
+    proc = subprocess.Popen(["inotifywait", "-m", "-q", "-e", "close_write", "-e", "moved_to",
+                             "--format", "%w%f", dossier], stdout=subprocess.PIPE, text=True)
+    for line in proc.stdout:
+        path = line.rstrip("\n")
+        # Les navigateurs écrivent d'abord un fichier temporaire, puis le renomment
+        if not av.is_risky(path) or path.endswith((".part", ".crdownload", ".tmp")):
+            continue
+        time.sleep(1)
+        if not os.path.isfile(path) or not av.ready():
+            continue
+        menaces, _ = av.scan_and_quarantine([path])
+        for m in menaces:
+            notifier("Téléchargement bloqué",
+                     f"« {m['nom']} » contenait {m['menace']}. Il a été mis en quarantaine : "
+                     "vous pouvez le voir dans le Centre de protection.", True)
+    return 0
+
+
+def main():
+    if len(sys.argv) < 2 or sys.argv[1] in ("-h", "--help"):
+        print(__doc__)
+        return 0
+    cmd, args = sys.argv[1], sys.argv[2:]
+    if cmd == "analyser":
+        return analyser(args or av.quick_targets())
+    if cmd == "surveiller":
+        return surveiller()
+    if cmd == "quarantaine":
+        for e in av.list_quarantine():
+            print(f"{e['date']}  {e['nom']}  ({e['menace']})  venait de {e['origine']}")
+        return 0
+    print(__doc__)
+    return 2
+
+
+if __name__ == "__main__":
+    sys.exit(main())

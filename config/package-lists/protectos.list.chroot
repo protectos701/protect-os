@@ -1,0 +1,27 @@
+# Le bureau, le thème et les applications viennent du métapaquet protectos-desktop
+# (voir packages/protectos-desktop/DEBIAN/control). Les paquets protect.OS eux-mêmes
+# sont construits par build.sh et placés dans config/packages.chroot/.
+protectos-desktop
+
+# ---------- Installateur (session d'essai uniquement) ----------
+protectos-calamares
+calamares
+calamares-settings-debian
+
+# ---------- Langue ----------
+# Les paquets de langue sont dans protectos-langue.list.chroot (créé par tools/personnaliser.py).
+locales
+
+# ---------- Matériel ----------
+bluetooth
+sudo
+firmware-linux
+firmware-iwlwifi
+firmware-realtek
+firmware-misc-nonfree
+
+# La compatibilité Windows (Wine 64 bits) arrive avec protectos-programmes ;
+# winetricks (section contrib) installe .NET, Visual C++, DirectX à la demande.
+winetricks
+cabextract
+# la partie 32 bits (wine32:i386) est ajoutée par config/hooks/normal/0500-protectos.hook.chroot.

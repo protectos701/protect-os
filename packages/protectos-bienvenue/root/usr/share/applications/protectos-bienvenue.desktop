@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Bienvenue dans protect.OS
+Comment=Régler protect.OS : apparence, pilotes, sauvegardes, applications
+Exec=protectos-bienvenue
+Icon=protectos-logo
+Terminal=false
+Categories=Qt;Settings;System;
+Keywords=bienvenue;démarrage;pilotes;nvidia;thème;sauvegarde;timeshift;steam;

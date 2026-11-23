@@ -1,0 +1,19 @@
+{
+    "KPackageStructure": "Plasma/LookAndFeel",
+    "KPlugin": {
+        "Authors": [
+            {
+                "Name": "protect.OS"
+            }
+        ],
+        "Category": "",
+        "Description": "Thème bleu et or de protect.OS : barre des tâches centrée, verre et reflets dorés",
+        "Description[fr]": "Thème bleu et or de protect.OS : barre des tâches centrée, verre et reflets dorés",
+        "Id": "org.protectos.desktop",
+        "License": "GPL-2.0-or-later",
+        "Name": "protect.OS Bleu et Or",
+        "Name[fr]": "protect.OS Bleu et Or",
+        "Version": "1.0"
+    },
+    "X-Plasma-MainScript": "defaults"
+}

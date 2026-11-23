@@ -1,0 +1,9 @@
+[Unit]
+Description=protect.OS : contrôle parental, vérification chaque minute
+
+[Timer]
+OnCalendar=*-*-* *:*:00
+AccuracySec=5s
+
+[Install]
+WantedBy=timers.target

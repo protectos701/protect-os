@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=protect.OS live : raccourci d'installation
+Exec=/usr/bin/protectos-live-desktop
+OnlyShowIn=KDE;
+NoDisplay=true
+X-KDE-autostart-phase=2

@@ -1,0 +1,51 @@
+#!/bin/sh
+# Corrections administrateur du Centre de protection (lancé via pkexec).
+# N'accepte que des actions prévues à l'avance.
+set -e
+export DEBIAN_FRONTEND=noninteractive
+[ "$#" -gt 0 ] || { echo "Usage : $0 pare-feu | mises-a-jour | sauvegardes | antivirus | vie-privee ..." >&2; exit 2; }
+for a in "$@"; do
+	case "$a" in
+		pare-feu|mises-a-jour|sauvegardes|antivirus|vie-privee) ;;
+		*) echo "Action inconnue : $a" >&2; exit 2 ;;
+	esac
+done
+
+MAJ_FAITE=0
+installer() {
+	if [ "$MAJ_FAITE" = 0 ]; then apt-get update; MAJ_FAITE=1; fi
+	apt-get install -y "$@"
+}
+
+for a in "$@"; do
+	case "$a" in
+		pare-feu)
+			command -v ufw >/dev/null 2>&1 || installer ufw
+			ufw default deny incoming
+			ufw default allow outgoing
+			ufw --force enable
+			mkdir -p /var/lib/protectos
+			touch /var/lib/protectos/pare-feu-initialise
+			;;
+		mises-a-jour)
+			installer unattended-upgrades
+			if [ ! -f /etc/apt/apt.conf.d/21protectos-mises-a-jour ]; then
+				printf 'APT::Periodic::Update-Package-Lists "1";\nAPT::Periodic::Unattended-Upgrade "1";\n' \
+					> /etc/apt/apt.conf.d/21protectos-mises-a-jour
+			fi
+			;;
+		sauvegardes)
+			installer timeshift
+			;;
+		vie-privee)
+			/usr/lib/protectos/protectos-bloqueur activer
+			;;
+		antivirus)
+			installer clamav clamav-freshclam inotify-tools
+			# Télécharge (ou met à jour) les signatures tout de suite, puis chaque jour via le service
+			systemctl stop clamav-freshclam >/dev/null 2>&1 || true
+			freshclam --quiet || true
+			systemctl enable --now clamav-freshclam >/dev/null 2>&1 || true
+			;;
+	esac
+done

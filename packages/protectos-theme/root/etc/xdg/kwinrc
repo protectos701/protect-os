@@ -1,0 +1,24 @@
+[org.kde.kdecoration2]
+library=org.kde.breeze
+theme=Breeze
+ButtonsOnLeft=M
+ButtonsOnRight=IAX
+
+[Plugins]
+blurEnabled=true
+contrastEnabled=true
+translucencyEnabled=true
+
+[Effect-blur]
+BlurStrength=12
+NoiseStrength=2
+
+# Effet verre : les fenêtres en arrière-plan et en déplacement deviennent légèrement transparentes
+[Effect-translucency]
+Inactive=92
+MoveResize=80
+Dialogs=100
+ComboboxPopups=92
+DropdownMenus=92
+PopupMenus=92
+TornOffMenus=92

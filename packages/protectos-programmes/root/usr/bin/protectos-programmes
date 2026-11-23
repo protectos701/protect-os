@@ -1,0 +1,368 @@
+#!/usr/bin/python3
+"""« Programmes et fonctionnalités » de protect.OS.
+
+Liste au même endroit les programmes Windows installés (lus dans le registre comme le fait
+Windows), les programmes Windows portables ajoutés au menu, et les applications protect.OS
+empaquetées avec protectos-pack. Permet de les désinstaller.
+"""
+import os
+import shutil
+import sys
+import time
+
+sys.path.insert(0, "/usr/lib/protectos")
+import protectos_programmes as vp  # noqa: E402
+
+from PyQt6.QtCore import QProcess, QProcessEnvironment, Qt, QUrl  # noqa: E402
+from PyQt6.QtGui import QDesktopServices, QFont, QIcon  # noqa: E402
+from PyQt6.QtWidgets import (  # noqa: E402
+    QAbstractItemView, QApplication, QCheckBox, QDialog, QHBoxLayout, QHeaderView, QLabel, QLineEdit, QMenu,
+    QMessageBox, QPushButton, QTreeWidget, QTreeWidgetItem, QVBoxLayout, QWidget)
+
+TYPES = {
+    "windows": ("Programme Windows", "wine"),
+    "portable": ("Windows portable", "application-x-ms-dos-executable"),
+    "protectos": ("Application protect.OS", "protectos-logo"),
+}
+
+
+class Programmes(QWidget):
+    def __init__(self):
+        super().__init__()
+        self.setWindowTitle("Programmes et fonctionnalités")
+        self.setWindowIcon(QIcon.fromTheme("protectos-logo"))
+        self.resize(860, 560)
+        self.busy = None
+
+        title = QLabel("Programmes et fonctionnalités")
+        f = QFont(title.font())
+        f.setPointSizeF(f.pointSizeF() * 1.6)
+        f.setBold(True)
+        title.setFont(f)
+        intro = QLabel("Pour désinstaller un programme, sélectionnez-le puis cliquez sur « Désinstaller ».")
+        intro.setWordWrap(True)
+
+        self.search = QLineEdit()
+        self.search.setPlaceholderText("Rechercher un programme")
+        self.search.setClearButtonEnabled(True)
+        self.search.textChanged.connect(self.filter)
+
+        self.tree = QTreeWidget()
+        self.tree.setHeaderLabels(["Nom", "Éditeur", "Version", "Type"])
+        self.tree.setRootIsDecorated(False)
+        self.tree.setAlternatingRowColors(True)
+        self.tree.setSortingEnabled(True)
+        self.tree.sortByColumn(0, Qt.SortOrder.AscendingOrder)
+        self.tree.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
+        self.tree.header().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
+        self.tree.itemSelectionChanged.connect(self.update_buttons)
+        self.tree.itemDoubleClicked.connect(lambda *_: self.uninstall())
+
+        self.empty = QLabel("Aucun programme installé pour l'instant.\n"
+                            "Double-cliquez sur un fichier .exe, .msi ou .deb pour l'installer.")
+        self.empty.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.empty.setEnabled(False)
+
+        add = QPushButton(QIcon.fromTheme("list-add"), "Installer un programme…")
+        add.clicked.connect(lambda: QProcess.startDetached("protectos-installer", []))
+        self.remove_btn = QPushButton(QIcon.fromTheme("edit-delete"), "Désinstaller")
+        self.remove_btn.clicked.connect(self.uninstall)
+        drive = QPushButton(QIcon.fromTheme("drive-harddisk"), "Disque C:")
+        drive.clicked.connect(self.open_drive)
+        more = QPushButton(QIcon.fromTheme("application-menu"), "Plus")
+        menu = QMenu(more)
+        cfg = menu.addAction(QIcon.fromTheme("configure"), "Réglages de la compatibilité Windows")
+        cfg.triggered.connect(lambda: self.start_wine(["winecfg"]))
+        comp = menu.addAction(QIcon.fromTheme("package-x-generic"), "Composants Windows (.NET, Visual C++…)")
+        comp.triggered.connect(self.components)
+        self.act32 = menu.addAction(QIcon.fromTheme("run-install"), "Activer les programmes Windows 32 bits…")
+        self.act32.triggered.connect(self.enable_32)
+        menu.addSeparator()
+        reset = menu.addAction(QIcon.fromTheme("edit-reset"), "Réinitialiser le disque C:…")
+        reset.triggered.connect(self.reset_prefix)
+        more.setMenu(menu)
+
+        buttons = QHBoxLayout()
+        buttons.addWidget(add)
+        buttons.addWidget(self.remove_btn)
+        buttons.addStretch(1)
+        buttons.addWidget(drive)
+        buttons.addWidget(more)
+
+        self.status = QLabel("")
+        self.status.setEnabled(False)
+
+        top = QHBoxLayout()
+        top.addWidget(title, 1)
+        top.addWidget(self.search)
+
+        lay = QVBoxLayout(self)
+        lay.setContentsMargins(20, 18, 20, 14)
+        lay.addLayout(top)
+        lay.addWidget(intro)
+        lay.addWidget(self.tree, 1)
+        lay.addWidget(self.empty, 1)
+        lay.addLayout(buttons)
+        lay.addWidget(self.status)
+        self.refresh()
+
+    # ------------------------------------------------------------ liste
+    def refresh(self):
+        self.tree.clear()
+        progs = vp.all_programs()
+        for p in progs:
+            label, icon = TYPES[p["type"]]
+            it = QTreeWidgetItem([p["nom"], p.get("editeur", ""), p.get("version", ""), label])
+            it.setIcon(0, QIcon.fromTheme(icon))
+            if p["type"] == "portable" and p.get("icone") and os.path.isfile(p["icone"]):
+                it.setIcon(0, QIcon(p["icone"]))
+            it.setData(0, Qt.ItemDataRole.UserRole, p)
+            self.tree.addTopLevelItem(it)
+        for col in (1, 2, 3):
+            self.tree.resizeColumnToContents(col)
+        self.tree.setVisible(bool(progs))
+        self.empty.setVisible(not progs)
+        msg = f"{len(progs)} programme{'s' if len(progs) > 1 else ''} installé{'s' if len(progs) > 1 else ''}"
+        if not vp.wine_available():
+            msg += " · compatibilité Windows non installée (paquet « wine »)"
+        elif not vp.support_32bits():
+            msg += " · programmes Windows 32 bits désactivés (menu « Plus »)"
+        self.status.setText(msg)
+        self.act32.setEnabled(vp.wine_available() and not vp.support_32bits())
+        self.filter(self.search.text())
+        self.update_buttons()
+
+    def filter(self, text):
+        t = text.strip().lower()
+        for i in range(self.tree.topLevelItemCount()):
+            it = self.tree.topLevelItem(i)
+            it.setHidden(bool(t) and t not in (it.text(0) + " " + it.text(1)).lower())
+
+    def selected(self):
+        items = self.tree.selectedItems()
+        return items[0].data(0, Qt.ItemDataRole.UserRole) if items else None
+
+    def update_buttons(self):
+        self.remove_btn.setEnabled(self.selected() is not None and self.busy is None)
+
+    # ------------------------------------------------------------ actions
+    def _env(self):
+        env = QProcessEnvironment.systemEnvironment()
+        for k, v in vp.wine_env().items():
+            env.insert(k, v)
+        return env
+
+    def _run(self, cmd, message, then):
+        self.busy = QProcess(self)
+        self.busy.setProcessEnvironment(self._env())
+        self.status.setText(message)
+        self.setCursor(Qt.CursorShape.BusyCursor)
+        self.update_buttons()
+
+        def done(code):
+            self.busy = None
+            self.unsetCursor()
+            then(code)
+            self.refresh()
+
+        self.busy.finished.connect(lambda code, _s: done(code))
+        self.busy.errorOccurred.connect(lambda e: done(-1) if e == QProcess.ProcessError.FailedToStart else None)
+        self.busy.start(cmd[0], cmd[1:])
+
+    def uninstall(self):
+        p = self.selected()
+        if not p or self.busy:
+            return
+        if QMessageBox.question(self, "Désinstaller",
+                                f"Voulez-vous vraiment désinstaller « {p['nom']} » ?") != QMessageBox.StandardButton.Yes:
+            return
+        if p["type"] == "portable":
+            vp.remove_portable(p["id"])
+            vp.refresh_menu()
+            self.refresh()
+        elif p["type"] == "windows":
+            # Comme sous Windows : on lance le programme de désinstallation enregistré par le programme
+            self._run(vp.uninstall_windows_command(p["id"]), f"Désinstallation de « {p['nom']} »…",
+                      lambda _c: self._after_windows())
+        else:
+            self._run(vp.uninstall_protectos_command(p["id"]), f"Désinstallation de « {p['nom']} »…",
+                      lambda c: None if c == 0 else QMessageBox.warning(
+                          self, "Désinstaller", "La désinstallation n'a pas abouti (mot de passe refusé ?)."))
+
+    def _after_windows(self):
+        # Attendre la fin des processus du disque C: avant de relire la liste
+        QProcess.execute(vp.wineserver(), ["-w"])
+        vp.refresh_menu()
+
+    def start_wine(self, args):
+        p = QProcess(self)
+        p.setProgram("wine")
+        p.setArguments(args)
+        p.setProcessEnvironment(self._env())
+        p.startDetached()
+
+    def open_drive(self):
+        if not vp.prefix_ready():
+            QMessageBox.information(self, "Disque C:",
+                                    "Le disque C: sera créé à la première installation d'un programme Windows.")
+            return
+        QDesktopServices.openUrl(QUrl.fromLocalFile(vp.drive_c()))
+
+    def enable_32(self):
+        if self.busy:
+            return
+        msg = ("protect.OS va installer la partie 32 bits de la compatibilité Windows (environ 300 Mo). "
+               "Votre mot de passe vous sera demandé.")
+        if vp.prefix_ready():
+            msg += ("\n\nVotre disque C: actuel a été créé sans elle : pour que les programmes 32 bits "
+                    "fonctionnent, réinitialisez-le ensuite (menu « Plus »).")
+        if QMessageBox.question(self, "Programmes Windows 32 bits", msg) != QMessageBox.StandardButton.Yes:
+            return
+        self._run(["pkexec", "/usr/lib/protectos/protectos-activer-32bits"],
+                  "Installation de la partie 32 bits… (quelques minutes)",
+                  lambda c: QMessageBox.information(self, "Programmes Windows 32 bits",
+                                                    "C'est prêt." if c == 0 else
+                                                    "L'installation n'a pas abouti. Vérifiez la connexion Internet."))
+
+    def components(self):
+        Composants(self).exec()
+
+    def reset_prefix(self):
+        if not vp.prefix_ready():
+            QMessageBox.information(self, "Réinitialiser", "Il n'y a pas encore de disque C:.")
+            return
+        old = vp.prefix() + ".ancien-" + time.strftime("%Y%m%d-%H%M%S")
+        if QMessageBox.question(
+                self, "Réinitialiser le disque C:",
+                "Le disque C: actuel sera mis de côté (rien n'est effacé) et un disque C: neuf sera créé "
+                f"à la prochaine installation.\n\nL'ancien sera conservé dans :\n{old}\n\n"
+                "Les programmes Windows installés devront être réinstallés. Continuer ?"
+        ) != QMessageBox.StandardButton.Yes:
+            return
+        QProcess.execute(vp.wineserver(), ["-k"])
+        shutil.move(vp.prefix(), old)
+        # Retirer les raccourcis du menu qui pointaient vers l'ancien disque
+        wine_menu = os.path.join(vp.APPS_DIR, "wine")
+        if os.path.isdir(wine_menu):
+            shutil.move(wine_menu, os.path.join(old, "raccourcis-menu"))
+        for p in vp.load_portables():
+            vp.remove_portable(p["id"])
+        vp.refresh_menu()
+        self.refresh()
+
+
+class Composants(QDialog):
+    """Ajouter des briques Windows au disque C:, comme les installeurs redistribuables sous Windows."""
+
+    def __init__(self, parent):
+        super().__init__(parent)
+        self.setWindowTitle("Composants Windows")
+        self.setMinimumWidth(520)
+        self.proc = None
+        lay = QVBoxLayout(self)
+        lay.setContentsMargins(20, 18, 20, 16)
+        intro = QLabel("Certains programmes Windows ont besoin de ces composants pour fonctionner. "
+                       "L'Installateur protect.OS les propose automatiquement quand il les détecte ; "
+                       "vous pouvez aussi les ajouter ici.")
+        intro.setWordWrap(True)
+        lay.addWidget(intro)
+        have = vp.installed_components()
+        self.checks = []
+        for verb, name, desc in vp.COMPONENTS:
+            cb = QCheckBox(f"{name} — {desc}")
+            if verb in have:
+                cb.setChecked(True)
+                cb.setEnabled(False)
+                cb.setText(f"{name} — installé")
+            self.checks.append((cb, verb))
+            lay.addWidget(cb)
+        self.status = QLabel("")
+        self.status.setWordWrap(True)
+        lay.addWidget(self.status)
+        row = QHBoxLayout()
+        self.tool = QPushButton(QIcon.fromTheme("run-install"), "Installer l'outil des composants")
+        self.tool.clicked.connect(self.install_tool)
+        self.go = QPushButton(QIcon.fromTheme("run-install"), "Ajouter la sélection")
+        self.go.setDefault(True)
+        self.go.clicked.connect(self.add)
+        close = QPushButton("Fermer")
+        close.clicked.connect(self.reject)
+        row.addWidget(self.tool)
+        row.addStretch(1)
+        row.addWidget(close)
+        row.addWidget(self.go)
+        lay.addLayout(row)
+        self.update_tool()
+
+    def update_tool(self):
+        ok = vp.winetricks_available()
+        self.tool.setVisible(not ok)
+        self.go.setEnabled(ok and self.proc is None)
+        if not ok:
+            self.status.setText("L'outil des composants (winetricks) n'est pas encore installé.")
+
+    def _start(self, cmd, busy, then):
+        self.proc = QProcess(self)
+        env = QProcessEnvironment.systemEnvironment()
+        for k, v in vp.wine_env().items():
+            env.insert(k, v)
+        self.proc.setProcessEnvironment(env)
+        self.status.setText(busy)
+        self.go.setEnabled(False)
+        self.tool.setEnabled(False)
+
+        def done(code):
+            self.proc = None
+            self.tool.setEnabled(True)
+            then(code)
+            self.update_tool()
+
+        self.proc.finished.connect(lambda code, _s: done(code))
+        self.proc.errorOccurred.connect(lambda e: done(-1) if e == QProcess.ProcessError.FailedToStart else None)
+        self.proc.start(cmd[0], cmd[1:])
+
+    def install_tool(self):
+        self._start(["pkexec", "/usr/lib/protectos/protectos-installer-composants"],
+                    "Installation de l'outil des composants… Saisissez votre mot de passe.",
+                    lambda c: self.status.setText("C'est prêt : cochez les composants à ajouter." if c == 0 else
+                                                  "L'installation n'a pas abouti (mot de passe ou connexion ?)."))
+
+    def add(self):
+        verbs = [v for cb, v in self.checks if cb.isChecked() and cb.isEnabled()]
+        if not verbs:
+            self.status.setText("Cochez au moins un composant.")
+            return
+        if not vp.prefix_ready():
+            QProcess.execute("wine", ["wineboot", "--init"])
+        names = ", ".join(vp.COMPONENT_NAMES[v] for v in verbs)
+
+        def finished(code):
+            have = vp.installed_components()
+            for cb, v in self.checks:
+                if v in have:
+                    cb.setEnabled(False)
+                    cb.setText(f"{vp.COMPONENT_NAMES[v]} — installé")
+            self.status.setText("Composants ajoutés." if code == 0 else
+                                "Certains composants n'ont pas pu être ajoutés. Vérifiez la connexion Internet.")
+
+        self._start(vp.winetricks_command(verbs),
+                    f"Ajout de {names}… Cela peut prendre plusieurs minutes, des fenêtres peuvent s'ouvrir.",
+                    finished)
+
+    def reject(self):
+        if self.proc:
+            return
+        super().reject()
+
+
+def main():
+    app = QApplication(sys.argv)
+    app.setApplicationName("Programmes et fonctionnalités")
+    app.setDesktopFileName("protectos-programmes")
+    w = Programmes()
+    w.show()
+    return app.exec()
+
+
+if __name__ == "__main__":
+    sys.exit(main())

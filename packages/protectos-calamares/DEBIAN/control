@@ -1,0 +1,11 @@
+Package: protectos-calamares
+Version: @VERSION@
+Architecture: all
+Maintainer: @MAINTAINER@
+Section: admin
+Priority: optional
+Depends: calamares, calamares-settings-debian, python3, python3-pyqt6
+Description: Installateur graphique aux couleurs de protect.OS
+ Habillage de l'installateur Calamares : logo, couleurs bleu et or et
+ diaporama de présentation pendant l'installation. Prévu pour l'image
+ d'essai ; il est retiré automatiquement du système une fois installé.

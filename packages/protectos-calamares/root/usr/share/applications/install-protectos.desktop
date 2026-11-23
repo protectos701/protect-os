@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Installer protect.OS
+Comment=Installer protect.OS sur cet ordinateur
+Exec=protectos-lancer-installation
+Icon=protectos-logo
+Terminal=false
+Categories=Qt;System;
+Keywords=installer;installation;calamares;

@@ -1,0 +1,137 @@
+#!/usr/bin/python3
+"""Actions administrateur du contrôle parental de protect.OS.
+
+  protectos-parental-root tick                 chaque minute (minuterie systemd) : compte le temps, prévient, ferme
+  protectos-parental-root appliquer            installe le filtrage des sites (au démarrage et après réglage)
+  protectos-parental-root enregistrer FICHIER  enregistre de nouveaux réglages (via pkexec, depuis l'application)
+"""
+import datetime
+import json
+import os
+import pwd
+import subprocess
+import sys
+import time
+
+sys.path.insert(0, "/usr/lib/protectos")
+import protectos_parental as pc  # noqa: E402
+
+FIREFOX_POLICIES = ("/etc/firefox-esr/policies/policies.json", "/etc/firefox/policies/policies.json")
+
+
+def notifier(login, titre, texte):
+    """Affiche une notification dans la session de l'enfant."""
+    try:
+        uid = pwd.getpwnam(login).pw_uid
+    except KeyError:
+        return
+    env = f"DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/{uid}/bus"
+    subprocess.run(["runuser", "-u", login, "--", "env", env, "notify-send", "-a", "protect.OS",
+                    "-i", "protectos-logo", "-u", "critical", titre, texte], capture_output=True)
+
+
+def session_active(login):
+    r = subprocess.run(["loginctl", "show-user", login, "-p", "State", "--value"], capture_output=True, text=True)
+    return r.stdout.strip() == "active"
+
+
+def tick():
+    data = pc.charger()
+    if not data["enfants"]:
+        return 0
+    maintenant = datetime.datetime.now()
+    connectes = pc.utilisateurs_connectes()
+    for login, regle in data["enfants"].items():
+        if login not in connectes:
+            continue
+        drapeau = os.path.join(pc.ETAT, login, "fin-" + maintenant.date().isoformat())
+        action, restantes, raison = pc.decision(regle, maintenant, pc.minutes_utilisees(login))
+        if action == "fin":
+            if not os.path.exists(drapeau):
+                os.makedirs(os.path.dirname(drapeau), exist_ok=True)
+                with open(drapeau, "w") as f:
+                    f.write(str(time.time()))
+                notifier(login, "C'est l'heure d'arrêter",
+                         f"Ta session va se fermer dans une minute : {raison}. Pense à enregistrer ton travail.")
+            elif time.time() - os.path.getmtime(drapeau) >= 50:
+                subprocess.run(["loginctl", "terminate-user", login])
+            continue
+        if os.path.exists(drapeau):
+            os.remove(drapeau)  # un parent a rallongé le temps
+        if session_active(login):
+            pc.ajouter_minute(login)
+        if action == "avertir":
+            notifier(login, "Temps d'écran",
+                     f"Il te reste {restantes} minute{'s' if restantes > 1 else ''}.")
+    return 0
+
+
+def firefox_doh(verrouiller):
+    """Empêche Firefox de contourner le filtre avec le DNS chiffré quand un compte enfant est filtré."""
+    for path in FIREFOX_POLICIES:
+        if not os.path.isdir(os.path.dirname(os.path.dirname(path))):
+            continue  # ce Firefox n'est pas installé
+        try:
+            data = json.load(open(path))
+        except (OSError, ValueError):
+            data = {"policies": {}}
+        pol = data.setdefault("policies", {})
+        if verrouiller:
+            pol["DNSOverHTTPS"] = {"Enabled": False, "Locked": True}
+        else:
+            pol.pop("DNSOverHTTPS", None)
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "w") as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+            f.write("\n")
+
+
+def appliquer():
+    data = pc.charger()
+    regles = pc.regles_nftables(data)
+    # Remplace entièrement notre table (sans toucher aux règles du pare-feu)
+    script = "add table inet protectos_parental\ndelete table inet protectos_parental\n"
+    if data["enfants"]:
+        script += regles
+    r = subprocess.run(["nft", "-f", "-"], input=script, text=True, capture_output=True)
+    if r.returncode:
+        print("Filtrage des sites : " + r.stderr.strip(), file=sys.stderr)
+    firefox_doh(any(e.get("filtre") for e in data["enfants"].values()))
+    return r.returncode
+
+
+def enregistrer(fichier):
+    try:
+        data = pc.valider(json.load(open(fichier, encoding="utf-8")))
+    except (OSError, ValueError) as e:
+        print(f"Réglages refusés : {e}", file=sys.stderr)
+        return 2
+    pc.enregistrer(data)
+    os.makedirs(pc.ETAT, exist_ok=True)
+    os.chmod(pc.ETAT, 0o755)
+    # Les drapeaux « fin » du jour sont remis à zéro : un parent a pu rallonger le temps
+    jour = datetime.date.today().isoformat()
+    for login in os.listdir(pc.ETAT):
+        f = os.path.join(pc.ETAT, login, "fin-" + jour)
+        if os.path.exists(f):
+            os.remove(f)
+    return appliquer()
+
+
+def main():
+    if len(sys.argv) < 2:
+        print(__doc__)
+        return 2
+    cmd = sys.argv[1]
+    if cmd == "tick":
+        return tick()
+    if cmd == "appliquer":
+        return appliquer()
+    if cmd == "enregistrer" and len(sys.argv) == 3:
+        return enregistrer(sys.argv[2])
+    print(__doc__)
+    return 2
+
+
+if __name__ == "__main__":
+    sys.exit(main())

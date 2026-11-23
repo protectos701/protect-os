@@ -1,0 +1,438 @@
+#!/usr/bin/python3
+"""protectos-pack : transforme un dossier de programme en paquet installable pour protect.OS.
+
+Le paquet produit (.deb) s'installe d'un double-clic, crée son raccourci dans le menu
+Démarrer avec son icône, et se désinstalle depuis « Programmes et fonctionnalités ».
+Il marche pour un programme Linux (script, binaire, Python…) comme pour un .exe Windows.
+
+  protectos-pack nouveau MonApp            crée un projet d'exemple dans MonApp/
+  protectos-pack nouveau MonApp --windows  idem, pour un programme Windows (.exe)
+  protectos-pack nouveau MonApp --python   application Python avec fenêtre bleu et or, prête à modifier
+  protectos-pack MonApp                    construit le paquet à partir de MonApp/protectos-app.json
+  protectos-pack MonApp -o dist/           … et le range dans dist/
+"""
+import argparse
+import hashlib
+import json
+import os
+import re
+import shutil
+import subprocess
+import sys
+import tempfile
+
+MANIFEST = "protectos-app.json"
+IGNORE = shutil.ignore_patterns(".git", "__pycache__", "*.deb", "*.pyc", ".DS_Store", "Thumbs.db")
+CATEGORIES = {"AudioVideo", "Audio", "Video", "Development", "Education", "Game", "Graphics",
+              "Network", "Office", "Science", "Settings", "System", "Utility"}
+
+
+def die(msg):
+    print(f"Erreur : {msg}", file=sys.stderr)
+    sys.exit(1)
+
+
+def slug(text):
+    import unicodedata
+    plain = unicodedata.normalize("NFKD", text).encode("ascii", "ignore").decode()
+    return re.sub(r"[^a-z0-9]+", "-", plain.lower()).strip("-") or "mon-app"
+
+
+# ------------------------------------------------------------------ nouveau projet
+ICON_SVG = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="256" height="256">
+<defs><linearGradient id="f" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3466d8"/><stop offset="1" stop-color="#0a1a52"/></linearGradient>
+<linearGradient id="o" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fff0b8"/><stop offset=".5" stop-color="#e3b53e"/><stop offset="1" stop-color="#a87b10"/></linearGradient></defs>
+<rect x="4" y="4" width="56" height="56" rx="14" fill="url(#f)" stroke="url(#o)" stroke-width="2"/>
+<path d="M22 20h20M22 32h20M22 44h12" stroke="url(#o)" stroke-width="5" stroke-linecap="round"/></svg>
+"""
+
+SCRIPT = """#!/bin/sh
+# Programme d'exemple : remplacez ce fichier par le vôtre.
+MSG="Bonjour ! Votre application protect.OS fonctionne."
+if command -v kdialog >/dev/null 2>&1; then
+\tkdialog --title "{nom}" --msgbox "$MSG"
+else
+\techo "$MSG"
+fi
+"""
+
+PYTHON_APP = '''#!/usr/bin/env python3
+"""__NOM__ : application protect.OS en Python (modèle à modifier).
+
+Exemple fourni : une petite liste de tâches enregistrée dans votre dossier personnel.
+Remplacez la classe Fenetre par votre propre programme ; gardez le style si vous l'aimez.
+"""
+import os
+import sys
+
+from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QFont, QIcon
+from PyQt6.QtWidgets import (QApplication, QHBoxLayout, QLabel, QLineEdit, QListWidget,
+                             QPushButton, QVBoxLayout, QWidget)
+
+APP_ID = "__ID__"
+NOM = "__NOM__"
+DONNEES = os.path.join(os.path.expanduser("~"), ".local", "share", APP_ID)
+FICHIER = os.path.join(DONNEES, "taches.txt")
+
+OR = "#d4a72c"
+STYLE = f"""
+#bandeau {{ background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #16307a, stop:1 #060f2e);
+           border-bottom: 2px solid {OR}; }}
+#bandeau QLabel {{ color: #eef2fb; }}
+#titre {{ color: #e8c15a; }}
+QPushButton#principal {{ background: {OR}; color: #1a1405; border: none; border-radius: 6px;
+                         padding: 8px 18px; font-weight: bold; }}
+QListWidget {{ border: 1px solid rgba(212,167,44,0.45); border-radius: 8px; padding: 4px; }}
+QListWidget::item {{ padding: 7px; border-radius: 6px; }}
+QListWidget::item:selected {{ background: rgba(212,167,44,0.25); color: palette(text); }}
+"""
+
+
+class Fenetre(QWidget):
+    def __init__(self):
+        super().__init__()
+        self.setWindowTitle(NOM)
+        self.setWindowIcon(QIcon.fromTheme(APP_ID, QIcon.fromTheme("protectos-logo")))
+        self.setStyleSheet(STYLE)
+        self.resize(560, 520)
+
+        # Bandeau bleu nuit et or
+        bandeau = QWidget()
+        bandeau.setObjectName("bandeau")
+        bl = QVBoxLayout(bandeau)
+        bl.setContentsMargins(22, 16, 22, 16)
+        titre = QLabel(NOM)
+        titre.setObjectName("titre")
+        f = QFont(titre.font())
+        f.setPointSizeF(f.pointSizeF() * 1.7)
+        f.setBold(True)
+        titre.setFont(f)
+        bl.addWidget(titre)
+        bl.addWidget(QLabel("Notez vos tâches. Double-clic sur une tâche pour la retirer."))
+
+        # Contenu : saisie + liste
+        self.saisie = QLineEdit()
+        self.saisie.setPlaceholderText("Nouvelle tâche…")
+        self.saisie.returnPressed.connect(self.ajouter)
+        bouton = QPushButton("Ajouter")
+        bouton.setObjectName("principal")
+        bouton.clicked.connect(self.ajouter)
+        ligne = QHBoxLayout()
+        ligne.addWidget(self.saisie, 1)
+        ligne.addWidget(bouton)
+        self.liste = QListWidget()
+        self.liste.itemDoubleClicked.connect(self.retirer)
+        self.compte = QLabel("")
+        self.compte.setEnabled(False)
+
+        corps = QVBoxLayout()
+        corps.setContentsMargins(22, 18, 22, 18)
+        corps.addLayout(ligne)
+        corps.addWidget(self.liste, 1)
+        corps.addWidget(self.compte)
+
+        lay = QVBoxLayout(self)
+        lay.setContentsMargins(0, 0, 0, 0)
+        lay.addWidget(bandeau)
+        lay.addLayout(corps, 1)
+        self.charger()
+
+    def charger(self):
+        try:
+            with open(FICHIER, encoding="utf-8") as f:
+                for ligne in f:
+                    if ligne.strip():
+                        self.liste.addItem(ligne.rstrip("\\n"))
+        except OSError:
+            pass
+        self.maj()
+
+    def enregistrer(self):
+        os.makedirs(DONNEES, exist_ok=True)
+        with open(FICHIER, "w", encoding="utf-8") as f:
+            for i in range(self.liste.count()):
+                f.write(self.liste.item(i).text() + "\\n")
+        self.maj()
+
+    def maj(self):
+        n = self.liste.count()
+        self.compte.setText(f"{n} tâche{'s' if n > 1 else ''}")
+
+    def ajouter(self):
+        texte = self.saisie.text().strip()
+        if texte:
+            self.liste.addItem(texte)
+            self.saisie.clear()
+            self.enregistrer()
+
+    def retirer(self, item):
+        self.liste.takeItem(self.liste.row(item))
+        self.enregistrer()
+
+
+def main():
+    app = QApplication(sys.argv)
+    app.setApplicationName(NOM)
+    app.setDesktopFileName(APP_ID)
+    fenetre = Fenetre()
+    fenetre.show()
+    return app.exec()
+
+
+if __name__ == "__main__":
+    sys.exit(main())
+'''
+
+GUIDE = """Projet d'application protect.OS : {nom}
+
+1. Mettez dans ce dossier tous les fichiers de votre programme.
+2. Ouvrez protectos-app.json et complétez :
+   - "lancer" : le fichier à exécuter ({lancer})
+   - "nom", "description", "auteur", "version"
+   - "icone" : une image .png ou .svg (carrée, 256×256 conseillé)
+   - "dependances" : les paquets Debian nécessaires (ex. "python3", "python3-pyqt6")
+   - "categories" : la rubrique du menu (Utility, Office, Game, Graphics, Development…)
+3. Construisez le paquet :   protectos-pack "{dossier}"
+4. Double-cliquez sur le fichier .deb obtenu pour l'installer.
+
+À chaque nouvelle version, augmentez "version" (1.0.0 → 1.0.1) et reconstruisez :
+l'installation par-dessus met simplement à jour le programme.
+"""
+
+
+def cmd_new(folder, windows, python=False):
+    if os.path.exists(folder) and os.listdir(folder):
+        die(f"le dossier {folder} existe déjà et n'est pas vide")
+    os.makedirs(folder, exist_ok=True)
+    name = os.path.basename(os.path.abspath(folder))
+    pid = slug(name)
+    lancer = f"{name}.exe" if windows else f"{pid}.py" if python else f"{pid}.sh"
+    manifest = {
+        "id": pid,
+        "nom": name,
+        "version": "1.0.0",
+        "auteur": "Votre nom <vous@exemple.fr>",
+        "description": "Ce que fait votre application, en une phrase.",
+        "lancer": lancer,
+        "icone": "icone.svg",
+        "categories": ["Utility"],
+        "dependances": ["python3", "python3-pyqt6"] if python else [],
+        "terminal": False,
+    }
+    with open(os.path.join(folder, MANIFEST), "w", encoding="utf-8") as f:
+        json.dump(manifest, f, ensure_ascii=False, indent=2)
+        f.write("\n")
+    with open(os.path.join(folder, "icone.svg"), "w") as f:
+        f.write(ICON_SVG)
+    if python:
+        path = os.path.join(folder, lancer)
+        with open(path, "w", encoding="utf-8") as f:
+            f.write(PYTHON_APP.replace("__ID__", pid).replace("__NOM__", name))
+        os.chmod(path, 0o755)
+    elif not windows:
+        path = os.path.join(folder, lancer)
+        with open(path, "w") as f:
+            f.write(SCRIPT.format(nom=name))
+        os.chmod(path, 0o755)
+    with open(os.path.join(folder, "LISEZMOI.txt"), "w", encoding="utf-8") as f:
+        f.write(GUIDE.format(nom=name, lancer=lancer, dossier=folder))
+        if windows:
+            f.write(f"\nProgramme Windows : copiez votre {lancer} (et ses fichiers .dll, données…)\n"
+                    "dans ce dossier. protect.OS le lancera avec la compatibilité Windows.\n"
+                    "L'icône peut être omise : celle du .exe sera utilisée automatiquement.\n")
+    cible = f'"{folder}"' if " " in folder else folder
+    print(f"Projet créé dans {folder}/ : complétez {MANIFEST}, puis lancez « protectos-pack {cible} ».")
+
+
+# ------------------------------------------------------------------ construction
+def load_manifest(src):
+    path = os.path.join(src, MANIFEST)
+    if not os.path.isfile(path):
+        die(f"pas de {MANIFEST} dans {src} (créez un projet avec « protectos-pack nouveau {src} »)")
+    try:
+        with open(path, encoding="utf-8") as f:
+            m = json.load(f)
+    except ValueError as e:
+        die(f"{MANIFEST} est mal écrit : {e}")
+    for key in ("id", "nom", "version", "lancer"):
+        if not str(m.get(key, "")).strip():
+            die(f"le champ « {key} » est obligatoire dans {MANIFEST}")
+    if not re.fullmatch(r"[a-z0-9][a-z0-9.+-]+", m["id"]):
+        die("« id » ne doit contenir que des minuscules, chiffres, « - », « + » ou « . » (ex. mon-app)")
+    if not re.fullmatch(r"[0-9][A-Za-z0-9.+~-]*", str(m["version"])):
+        die("« version » doit commencer par un chiffre (ex. 1.0.0)")
+    if not os.path.isfile(os.path.join(src, m["lancer"])):
+        die(f"le fichier à lancer « {m['lancer']} » est introuvable dans {src}")
+    unknown = [c for c in m.get("categories", []) if c not in CATEGORIES]
+    if unknown:
+        die(f"catégorie inconnue : {', '.join(unknown)} (choix : {', '.join(sorted(CATEGORIES))})")
+    return m
+
+
+def extract_exe_icon(exe, dest):
+    if not (shutil.which("wrestool") and shutil.which("icotool")):
+        return False
+    with tempfile.TemporaryDirectory() as tmp:
+        ico = os.path.join(tmp, "i.ico")
+        if subprocess.run(["wrestool", "-x", "-t", "14", "-o", ico, exe], capture_output=True).returncode:
+            return False
+        subprocess.run(["icotool", "-x", "-o", tmp, ico], capture_output=True)
+        pngs = sorted((f for f in os.listdir(tmp) if f.endswith(".png")),
+                      key=lambda f: [int(x) for x in re.findall(r"\d+", f)[-3:]] or [0])
+        if not pngs:
+            return False
+        shutil.copy(os.path.join(tmp, pngs[-1]), dest)
+        return True
+
+
+def desktop_escape(s):
+    return str(s).replace("\n", " ").strip()
+
+
+def cmd_build(src, outdir):
+    src = os.path.abspath(src)
+    m = load_manifest(src)
+    pid, version = m["id"], str(m["version"])
+    arch = m.get("architecture", "all")
+    lancer = m["lancer"]
+    windows = lancer.lower().endswith((".exe", ".bat", ".com"))
+    deps = list(m.get("dependances", []))
+    if windows and "wine" not in deps:
+        deps.append("wine")
+
+    with tempfile.TemporaryDirectory() as stage:
+        os.chmod(stage, 0o755)
+        appdir = os.path.join(stage, "opt", "protectos-apps", pid)
+        shutil.copytree(src, appdir, ignore=IGNORE, symlinks=True)
+        target = f"/opt/protectos-apps/{pid}/{lancer}"
+
+        # Commande de lancement
+        bindir = os.path.join(stage, "usr", "bin")
+        os.makedirs(bindir)
+        with open(os.path.join(bindir, pid), "w") as f:
+            if windows:
+                f.write("#!/bin/sh\n# Lance le programme Windows avec la compatibilité Windows de protect.OS\n"
+                        "export WINEDEBUG=-all\n"
+                        f"cd \"$(dirname \"{target}\")\"\n"
+                        f"exec wine \"{target}\" \"$@\"\n")
+            else:
+                f.write(f"#!/bin/sh\nexec \"{target}\" \"$@\"\n")
+
+        # Icône
+        icon_name = "application-x-executable"
+        icone = m.get("icone", "")
+        icon_src = os.path.join(src, icone) if icone else ""
+        if icone and not os.path.isfile(icon_src):
+            die(f"l'icône « {icone} » est introuvable")
+        if icon_src and icone.lower().endswith(".svg"):
+            d = os.path.join(stage, "usr", "share", "icons", "hicolor", "scalable", "apps")
+            os.makedirs(d)
+            shutil.copy(icon_src, os.path.join(d, pid + ".svg"))
+            icon_name = pid
+        elif icon_src and icone.lower().endswith(".png"):
+            d = os.path.join(stage, "usr", "share", "pixmaps")
+            os.makedirs(d)
+            shutil.copy(icon_src, os.path.join(d, pid + ".png"))
+            icon_name = pid
+        elif icon_src:
+            die("l'icône doit être un fichier .png ou .svg")
+        elif windows:
+            d = os.path.join(stage, "usr", "share", "pixmaps")
+            os.makedirs(d)
+            if extract_exe_icon(os.path.join(src, lancer), os.path.join(d, pid + ".png")):
+                icon_name = pid
+            else:
+                os.rmdir(d)
+                icon_name = "wine"
+
+        # Raccourci du menu Démarrer
+        appsdir = os.path.join(stage, "usr", "share", "applications")
+        os.makedirs(appsdir)
+        cats = m.get("categories") or ["Utility"]
+        with open(os.path.join(appsdir, pid + ".desktop"), "w", encoding="utf-8") as f:
+            f.write("[Desktop Entry]\nType=Application\n"
+                    f"Name={desktop_escape(m['nom'])}\n"
+                    f"Comment={desktop_escape(m.get('description', ''))}\n"
+                    f"Exec={pid}\nIcon={icon_name}\n"
+                    f"Terminal={'true' if m.get('terminal') else 'false'}\n"
+                    f"Categories={';'.join(cats)};\n")
+
+        # Droits
+        for root, dirs, files in os.walk(stage):
+            for d in dirs:
+                os.chmod(os.path.join(root, d), 0o755)
+            for fn in files:
+                p = os.path.join(root, fn)
+                if not os.path.islink(p):
+                    os.chmod(p, 0o755 if os.access(p, os.X_OK) else 0o644)
+        os.chmod(os.path.join(bindir, pid), 0o755)
+        if not windows:
+            os.chmod(os.path.join(appdir, lancer), 0o755)
+
+        # Description du paquet
+        size_kb = 0
+        md5 = []
+        for root, _dirs, files in os.walk(stage):
+            for fn in sorted(files):
+                p = os.path.join(root, fn)
+                if os.path.islink(p):
+                    continue
+                size_kb += (os.path.getsize(p) + 1023) // 1024
+                rel = os.path.relpath(p, stage)
+                md5.append(f"{hashlib.md5(open(p, 'rb').read()).hexdigest()}  {rel}")
+        auteur = m.get("auteur", "").strip() or "Auteur inconnu"
+        if "<" not in auteur:
+            auteur += f" <{pid}@protectos-apps.invalid>"
+        desc = str(m.get("description", "")).strip() or m["nom"]
+        long_desc = "\n".join(" " + (line if line.strip() else ".") for line in desc.splitlines())
+        control = (f"Package: {pid}\nVersion: {version}\nArchitecture: {arch}\n"
+                   f"Maintainer: {auteur}\nSection: protectos\nPriority: optional\n"
+                   + (f"Depends: {', '.join(deps)}\n" if deps else "")
+                   + f"Installed-Size: {max(size_kb, 1)}\n"
+                   f"Description: {desktop_escape(m['nom'])}\n{long_desc}\n")
+        debian = os.path.join(stage, "DEBIAN")
+        os.makedirs(debian)
+        with open(os.path.join(debian, "control"), "w", encoding="utf-8") as f:
+            f.write(control)
+        with open(os.path.join(debian, "md5sums"), "w", encoding="utf-8") as f:
+            f.write("\n".join(md5) + "\n")
+        os.chmod(debian, 0o755)
+
+        os.makedirs(outdir, exist_ok=True)
+        out = os.path.join(outdir, f"{pid}_{version}_{arch}.deb")
+        r = subprocess.run(["dpkg-deb", "--root-owner-group", "-Zxz", "--build", stage, out],
+                           capture_output=True, text=True)
+        if r.returncode:
+            die("dpkg-deb a échoué :\n" + r.stderr)
+    kind = "programme Windows" if windows else "programme Linux"
+    print(f"Paquet créé : {out}  ({kind}, {os.path.getsize(out) // 1024} Ko)")
+    print("Double-cliquez dessus pour l'installer, ou : sudo apt install ./" + os.path.relpath(out))
+    return out
+
+
+def main():
+    argv = sys.argv[1:]
+    if argv[:1] == ["nouveau"]:
+        ap = argparse.ArgumentParser(prog="protectos-pack nouveau", description="Crée un projet d'application protect.OS.")
+        ap.add_argument("dossier")
+        genre = ap.add_mutually_exclusive_group()
+        genre.add_argument("--windows", action="store_true", help="projet pour un programme Windows (.exe)")
+        genre.add_argument("--python", action="store_true", help="application Python avec fenêtre bleu et or")
+        a = ap.parse_args(argv[1:])
+        cmd_new(a.dossier, a.windows, a.python)
+        return
+    if argv[:1] == ["construire"]:
+        argv = argv[1:]
+    ap = argparse.ArgumentParser(prog="protectos-pack", description=__doc__,
+                                 formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("dossier", help=f"dossier du programme, contenant {MANIFEST}")
+    ap.add_argument("-o", "--sortie", default=".", help="dossier où ranger le paquet (par défaut : ici)")
+    a = ap.parse_args(argv)
+    if not shutil.which("dpkg-deb"):
+        die("dpkg-deb est introuvable (paquet « dpkg »)")
+    cmd_build(a.dossier, a.sortie)
+
+
+if __name__ == "__main__":
+    main()

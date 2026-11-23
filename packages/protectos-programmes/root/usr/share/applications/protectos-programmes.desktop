@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Programmes et fonctionnalités
+GenericName=Ajouter ou supprimer des programmes
+Comment=Installer et désinstaller les programmes Windows et les applications protect.OS
+Exec=protectos-programmes
+Icon=protectos-logo
+Terminal=false
+Categories=Qt;Settings;System;
+Keywords=désinstaller;installer;programmes;windows;wine;exe;msi;ajout;suppression;logiciels;

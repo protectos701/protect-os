@@ -1,0 +1,9 @@
+Package: protectos-archive-keyring
+Version: @VERSION@
+Architecture: all
+Maintainer: @MAINTAINER@
+Section: misc
+Priority: optional
+Description: Clé et adresse du dépôt de mises à jour protect.OS
+ Ajoute le dépôt de protect.OS aux sources d'APT, avec la clé publique qui
+ garantit que les mises à jour viennent bien de l'équipe protect.OS.

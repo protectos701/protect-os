@@ -1,0 +1,9 @@
+#!/bin/sh
+# Active les programmes Windows 32 bits (lancé par « Programmes et fonctionnalités » via pkexec).
+# Dans Debian 13, Wine a besoin de sa partie 32 bits (wine32:i386) pour les programmes 32 bits.
+set -e
+if ! dpkg --print-foreign-architectures | grep -qx i386; then
+	dpkg --add-architecture i386
+fi
+apt-get update
+DEBIAN_FRONTEND=noninteractive apt-get install -y wine32:i386

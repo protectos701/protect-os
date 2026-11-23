@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=Vérification de la protection
+Exec=sh -c "sleep 120; exec protectos-protection --verifier"
+Icon=protectos-logo
+OnlyShowIn=KDE;
+NoDisplay=true

@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE policyconfig PUBLIC "-//freedesktop//DTD PolicyKit Policy Configuration 1.0//EN"
+ "http://www.freedesktop.org/standards/PolicyKit/1/policyconfig.dtd">
+<policyconfig>
+  <vendor>protect.OS</vendor>
+  <action id="org.protectos.activer-32bits">
+    <description>Activer les programmes Windows 32 bits</description>
+    <message>Saisissez votre mot de passe pour installer la partie 32 bits de la compatibilité Windows.</message>
+    <icon_name>protectos-logo</icon_name>
+    <defaults>
+      <allow_any>auth_admin</allow_any>
+      <allow_inactive>auth_admin</allow_inactive>
+      <allow_active>auth_admin_keep</allow_active>
+    </defaults>
+    <annotate key="org.freedesktop.policykit.exec.path">/usr/lib/protectos/protectos-activer-32bits</annotate>
+  </action>
+  <action id="org.protectos.composants-windows">
+    <description>Installer l'outil des composants Windows</description>
+    <message>Saisissez votre mot de passe pour installer l'outil des composants Windows (winetricks).</message>
+    <icon_name>protectos-logo</icon_name>
+    <defaults>
+      <allow_any>auth_admin</allow_any>
+      <allow_inactive>auth_admin</allow_inactive>
+      <allow_active>auth_admin_keep</allow_active>
+    </defaults>
+    <annotate key="org.freedesktop.policykit.exec.path">/usr/lib/protectos/protectos-installer-composants</annotate>
+  </action>
+</policyconfig>

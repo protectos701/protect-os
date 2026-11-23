@@ -1,0 +1,14 @@
+[Unit]
+Description=protect.OS : contrôle parental (filtrage des sites)
+ConditionPathExists=/etc/protectos/parental.json
+After=nftables.service
+Before=network-pre.target
+Wants=network-pre.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/lib/protectos/protectos-parental-root appliquer
+
+[Install]
+WantedBy=multi-user.target

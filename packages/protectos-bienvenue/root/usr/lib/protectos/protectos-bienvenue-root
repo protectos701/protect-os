@@ -1,0 +1,62 @@
+#!/bin/sh
+# Actions administrateur de « Bienvenue dans protect.OS », lancées via pkexec.
+# N'accepte que des actions et des paquets prévus à l'avance.
+set -e
+export DEBIAN_FRONTEND=noninteractive
+
+# Ajoute les sections contrib / non-free de Debian si elles manquent
+ensure_component() {
+	if ! grep -rqsE -- "^[^#]*(^|[[:space:]])$1([[:space:]]|\$)" /etc/apt/sources.list /etc/apt/sources.list.d/; then
+		cat > /etc/apt/sources.list.d/protectos-$1.sources <<EOF
+Types: deb
+URIs: http://deb.debian.org/debian
+Suites: trixie trixie-updates
+Components: $1
+Signed-By: /usr/share/keyrings/debian-archive-keyring.gpg
+EOF
+	fi
+}
+
+case "$1" in
+	nvidia)
+		ensure_component non-free
+		ensure_component non-free-firmware
+		apt-get update
+		apt-get install -y nvidia-driver firmware-misc-nonfree linux-headers-amd64
+		;;
+	sauvegardes)
+		apt-get update
+		apt-get install -y timeshift
+		;;
+	applis)
+		shift
+		[ "$#" -gt 0 ] || { echo "Aucun paquet demandé" >&2; exit 2; }
+		for p in "$@"; do
+			case "$p" in
+				steam-installer|gimp|krita|inkscape|kdenlive|obs-studio|audacity|thunderbird|thunderbird-l10n-fr) ;;
+				*) echo "Paquet non autorisé : $p" >&2; exit 2 ;;
+			esac
+		done
+		for p in "$@"; do
+			if [ "$p" = "steam-installer" ]; then
+				# Steam : jeux 32 bits, section contrib, licence de Valve acceptée dans l'interface
+				ensure_component contrib
+				ensure_component non-free
+				dpkg --print-foreign-architectures | grep -qx i386 || dpkg --add-architecture i386
+				echo "steam steam/question select I AGREE" | debconf-set-selections
+				echo "steam steam/license note ''" | debconf-set-selections
+			fi
+		done
+		apt-get update
+		apt-get install -y "$@"
+		;;
+	flathub)
+		apt-get update
+		apt-get install -y flatpak plasma-discover-backend-flatpak
+		flatpak remote-add --system --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
+		;;
+	*)
+		echo "Usage : $0 nvidia | sauvegardes | flathub | applis PAQUET..." >&2
+		exit 2
+		;;
+esac

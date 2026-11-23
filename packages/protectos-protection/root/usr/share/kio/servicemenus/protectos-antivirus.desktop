@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Service
+MimeType=all/all;
+Actions=analyser;
+X-KDE-Priority=TopLevel
+
+[Desktop Action analyser]
+Name=Analyser avec l'antivirus
+Icon=protectos-logo
+Exec=protectos-protection --analyser %F

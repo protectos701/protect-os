@@ -1,0 +1,98 @@
+#!/usr/bin/python3
+"""Conseils avant l'installation de protect.OS (sauvegarde et chiffrement), puis lancement de l'installateur."""
+import os
+import sys
+
+from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QFont, QIcon
+from PyQt6.QtWidgets import (QApplication, QCheckBox, QDialog, QFrame, QHBoxLayout, QLabel, QPushButton,
+                             QVBoxLayout)
+
+OR = "#d4a72c"
+NOM = "protect.OS"
+
+
+class Avant(QDialog):
+    def __init__(self):
+        super().__init__()
+        self.setWindowTitle(f"Installer {NOM}")
+        self.setWindowIcon(QIcon.fromTheme("protectos-logo"))
+        self.setMinimumWidth(620)
+        self.setStyleSheet(f"""
+            QFrame#carte {{ border: 1px solid rgba(212,167,44,0.45); border-radius: 10px; }}
+            QPushButton#principal {{ background: {OR}; color: #1a1405; border: none; border-radius: 6px;
+                                     padding: 9px 20px; font-weight: bold; }}
+            QPushButton#principal:disabled {{ background: rgba(212,167,44,0.35); }}""")
+
+        logo = QLabel()
+        logo.setPixmap(QIcon.fromTheme("protectos-logo").pixmap(64, 64))
+        titre = QLabel(f"Avant d'installer {NOM}")
+        f = QFont(titre.font())
+        f.setPointSizeF(f.pointSizeF() * 1.5)
+        f.setBold(True)
+        titre.setFont(f)
+        head = QHBoxLayout()
+        head.addWidget(logo)
+        head.addSpacing(10)
+        head.addWidget(titre, 1)
+
+        def carte(numero, texte):
+            fr = QFrame()
+            fr.setObjectName("carte")
+            h = QHBoxLayout(fr)
+            h.setContentsMargins(14, 12, 14, 12)
+            pastille = QLabel(str(numero))
+            pastille.setFixedSize(30, 30)
+            pastille.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            pastille.setStyleSheet(f"background:{OR}; color:#1a1405; border-radius:15px; font-weight:bold;")
+            lab = QLabel(texte)
+            lab.setWordWrap(True)
+            lab.setTextFormat(Qt.TextFormat.RichText)
+            h.addWidget(pastille, 0, Qt.AlignmentFlag.AlignTop)
+            h.addSpacing(6)
+            h.addWidget(lab, 1)
+            return fr
+
+        sauvegarde = carte(1, "<b>Sauvegardez vos fichiers.</b> Si vous installez à la place de Windows "
+                              "(« Effacer le disque »), tout ce qui se trouve sur le disque sera effacé : photos, "
+                              "documents, jeux. Copiez-les d'abord sur une clé USB ou un disque externe.")
+        chiffrement = carte(2, "<b>Chiffrez votre disque — fortement conseillé.</b> À l'étape « Partitions », "
+                               "cochez <b>« Chiffrer le système »</b> et choisissez une phrase secrète. En cas de "
+                               "vol ou de perte de l'ordinateur, personne ne pourra lire vos fichiers.<br><br>"
+                               "Cette phrase sera demandée à chaque démarrage. <b>Notez-la en lieu sûr</b> : "
+                               "sans elle, vos fichiers seraient perdus.")
+        self.ok = QCheckBox("J'ai sauvegardé mes fichiers importants (ou l'ordinateur est vide)")
+        self.ok.toggled.connect(lambda on: self.go.setEnabled(on))
+
+        annuler = QPushButton("Annuler")
+        annuler.clicked.connect(self.reject)
+        self.go = QPushButton(QIcon.fromTheme("run-install"), "Lancer l'installation")
+        self.go.setObjectName("principal")
+        self.go.setEnabled(False)
+        self.go.setDefault(True)
+        self.go.clicked.connect(self.accept)
+        row = QHBoxLayout()
+        row.addStretch(1)
+        row.addWidget(annuler)
+        row.addWidget(self.go)
+
+        lay = QVBoxLayout(self)
+        lay.setContentsMargins(22, 20, 22, 18)
+        lay.setSpacing(14)
+        lay.addLayout(head)
+        lay.addWidget(sauvegarde)
+        lay.addWidget(chiffrement)
+        lay.addWidget(self.ok)
+        lay.addLayout(row)
+
+
+def main():
+    app = QApplication(sys.argv)
+    app.setDesktopFileName("install-protectos")
+    if Avant().exec() == QDialog.DialogCode.Accepted:
+        os.execvp("install-debian", ["install-debian"])
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

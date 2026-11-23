@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Service
+MimeType=application/x-ms-dos-executable;application/x-msdownload;application/vnd.microsoft.portable-executable;application/x-msi;application/x-ms-installer;application/vnd.debian.binary-package;
+Actions=installer;
+X-KDE-Priority=TopLevel
+
+[Desktop Action installer]
+Name=Installer avec protect.OS
+Icon=protectos-logo
+Exec=protectos-installer %f

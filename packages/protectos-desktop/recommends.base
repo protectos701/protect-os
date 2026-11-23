@@ -1,0 +1,37 @@
+# Logiciels inclus d'origine (un par ligne). Ne modifiez pas ce fichier :
+# utilisez ma-personnalisation.conf (section [logiciels]).
+protectos-archive-keyring
+timeshift
+plasma-discover
+plasma-systemmonitor
+dolphin
+konsole
+kate
+ark
+gwenview
+okular
+kcalc
+kde-spectacle
+partitionmanager
+firefox-esr
+libreoffice-writer
+libreoffice-calc
+libreoffice-impress
+vlc
+network-manager
+fonts-noto
+fonts-noto-color-emoji
+cups
+print-manager
+printer-driver-gutenprint
+hplip
+system-config-printer-common
+skanlite
+sane-utils
+flatpak
+plasma-discover-backend-flatpak
+unattended-upgrades
+ufw
+plasma-firewall
+systemd-zram-generator
+power-profiles-daemon

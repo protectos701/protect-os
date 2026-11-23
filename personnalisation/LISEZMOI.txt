@@ -1,0 +1,2 @@
+Déposez ici votre logo et votre fond d'écran, puis indiquez leurs noms
+dans ma-personnalisation.conf (sections [logo] et [fond_ecran]).

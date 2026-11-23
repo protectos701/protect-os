@@ -1,0 +1,6 @@
+#!/bin/sh
+set -e
+if [ "$1" = "remove" ] && [ -f /etc/calamares/settings.conf ]; then
+	sed -i 's/^branding: protectos$/branding: debian/' /etc/calamares/settings.conf
+fi
+exit 0

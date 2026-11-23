@@ -1,0 +1,393 @@
+#!/usr/bin/python3
+"""Centre de protection de protect.OS.
+
+  protectos-protection             ouvre le Centre de protection
+  protectos-protection --verifier  vérifie sans fenêtre et prévient par une notification s'il y a un problème
+  protectos-protection --analyser CHEMIN...  ouvre l'antivirus et analyse ces fichiers ou dossiers
+"""
+import os
+import shutil
+import subprocess
+import sys
+import time
+
+sys.path.insert(0, "/usr/lib/protectos")
+import protectos_protection as pp  # noqa: E402
+import protectos_antivirus as av  # noqa: E402
+
+STYLES = {  # état → (symbole, couleur)
+    "ok": ("✓", "#2fa86b"),
+    "attention": ("!", "#e0a020"),
+    "risque": ("✕", "#d9534f"),
+    "info": ("i", "#6b7a99"),
+}
+
+
+def verifier():
+    """Mode silencieux (au démarrage de session) : notification seulement en cas de risque."""
+    results = pp.run_all()
+    state, text = pp.summary(results)
+    if state == "risque" and shutil.which("notify-send"):
+        titres = ", ".join(r["titre"].lower() for r in results if r["etat"] == "risque")
+        subprocess.run(["notify-send", "-a", "protect.OS", "-i", "protectos-logo", "-u", "critical",
+                        "Centre de protection", f"{text} : {titres}. Ouvrez le Centre de protection pour corriger."])
+    return 0
+
+
+if "--verifier" in sys.argv:
+    sys.exit(verifier())
+
+from PyQt6.QtCore import QProcess, Qt  # noqa: E402
+from PyQt6.QtGui import QFont, QIcon  # noqa: E402
+from PyQt6.QtWidgets import (  # noqa: E402
+    QApplication, QButtonGroup, QDialog, QFileDialog, QFrame, QHBoxLayout, QLabel, QListWidget,
+    QListWidgetItem, QMessageBox, QProgressBar, QPushButton, QRadioButton, QScrollArea, QVBoxLayout, QWidget)
+
+OR = "#d4a72c"
+STYLE = f"""
+#banniere {{ background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #16307a, stop:1 #060f2e);
+            border-bottom: 2px solid {OR}; }}
+#banniere QLabel {{ color: #eef2fb; }}
+QFrame#ligne {{ border: 1px solid rgba(212,167,44,0.35); border-radius: 10px; }}
+QPushButton#principal {{ background: {OR}; color: #1a1405; border: none; border-radius: 6px;
+                         padding: 7px 16px; font-weight: bold; }}
+QPushButton#principal:disabled {{ background: rgba(212,167,44,0.4); }}
+"""
+
+
+class Centre(QWidget):
+    def __init__(self):
+        super().__init__()
+        self.setWindowTitle("Centre de protection")
+        self.setWindowIcon(QIcon.fromTheme("protectos-logo"))
+        self.setStyleSheet(STYLE)
+        self.resize(780, 640)
+        self.proc = None
+
+        # Bannière : bouclier + état général
+        banner = QWidget()
+        banner.setObjectName("banniere")
+        bl = QHBoxLayout(banner)
+        bl.setContentsMargins(24, 18, 24, 18)
+        shield = QLabel()
+        shield.setPixmap(QIcon.fromTheme("protectos-logo").pixmap(72, 72))
+        self.etat = QLabel("")
+        f = QFont(self.etat.font())
+        f.setPointSizeF(f.pointSizeF() * 1.6)
+        f.setBold(True)
+        self.etat.setFont(f)
+        self.etat.setWordWrap(True)
+        self.quand = QLabel("")
+        tv = QVBoxLayout()
+        tv.addWidget(self.etat)
+        tv.addWidget(self.quand)
+        self.fix_all = QPushButton(QIcon.fromTheme("security-high"), "Tout corriger")
+        self.fix_all.setObjectName("principal")
+        self.fix_all.clicked.connect(self.corriger_tout)
+        refresh = QPushButton(QIcon.fromTheme("view-refresh"), "Actualiser")
+        refresh.clicked.connect(self.refresh)
+        self.analyse_btn = QPushButton(QIcon.fromTheme("security-medium"), "Antivirus…")
+        self.analyse_btn.clicked.connect(lambda: (Analyse(self).exec(), self.refresh()))
+        bv = QVBoxLayout()
+        bv.addWidget(self.fix_all)
+        bv.addWidget(self.analyse_btn)
+        bv.addWidget(refresh)
+        bl.addWidget(shield)
+        bl.addSpacing(12)
+        bl.addLayout(tv, 1)
+        bl.addLayout(bv)
+
+        # Liste des vérifications
+        self.liste = QVBoxLayout()
+        self.liste.setSpacing(10)
+        host = QWidget()
+        hv = QVBoxLayout(host)
+        hv.setContentsMargins(20, 16, 20, 16)
+        hv.addLayout(self.liste)
+        hv.addStretch(1)
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.Shape.NoFrame)
+        scroll.setWidget(host)
+
+        self.bar = QProgressBar()
+        self.bar.setRange(0, 0)
+        self.bar.hide()
+        self.message = QLabel("")
+        self.message.setWordWrap(True)
+        foot = QVBoxLayout()
+        foot.setContentsMargins(20, 0, 20, 14)
+        foot.addWidget(self.bar)
+        foot.addWidget(self.message)
+
+        lay = QVBoxLayout(self)
+        lay.setContentsMargins(0, 0, 0, 0)
+        lay.addWidget(banner)
+        lay.addWidget(scroll, 1)
+        lay.addLayout(foot)
+        self.refresh()
+
+    # ------------------------------------------------------------ affichage
+    def refresh(self):
+        while self.liste.count():
+            w = self.liste.takeAt(0).widget()
+            if w:
+                w.deleteLater()
+        self.results = pp.run_all()
+        state, text = pp.summary(self.results)
+        sym, color = STYLES[state]
+        self.etat.setText(f"<span style='color:{color if state != 'ok' else '#e8c15a'}'>{sym}</span>&nbsp; {text}")
+        self.quand.setText("Dernière vérification : " + time.strftime("%H:%M"))
+        order = {"risque": 0, "attention": 1, "ok": 2, "info": 3}
+        for r in sorted(self.results, key=lambda r: order[r["etat"]]):
+            self.liste.addWidget(self.ligne(r))
+        fixable = [r for r in self.results if r["etat"] in ("risque", "attention")
+                   and (r["corriger"].startswith("root:") or r["corriger"].startswith("user:"))]
+        self.analyse_btn.setEnabled(av.ready())
+        self.fix_all.setEnabled(bool(fixable) and self.proc is None)
+
+    def ligne(self, r):
+        fr = QFrame()
+        fr.setObjectName("ligne")
+        h = QHBoxLayout(fr)
+        h.setContentsMargins(14, 12, 14, 12)
+        sym, color = STYLES[r["etat"]]
+        badge = QLabel(sym)
+        badge.setFixedSize(30, 30)
+        badge.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        badge.setStyleSheet(f"background:{color}; color:white; border-radius:15px; font-weight:bold;")
+        title = QLabel(f"<b>{r['titre']}</b><br>{r['detail']}")
+        title.setWordWrap(True)
+        h.addWidget(badge, 0, Qt.AlignmentFlag.AlignTop)
+        h.addSpacing(6)
+        h.addWidget(title, 1)
+        if r.get("action"):
+            b = QPushButton(r["action"])
+            if r["etat"] == "risque":
+                b.setObjectName("principal")
+            b.clicked.connect(lambda _c=False, rr=r: self.corriger([rr]))
+            b.setEnabled(self.proc is None)
+            h.addWidget(b, 0, Qt.AlignmentFlag.AlignVCenter)
+        return fr
+
+    # ------------------------------------------------------------ corrections
+    def corriger_tout(self):
+        self.corriger([r for r in self.results if r["etat"] in ("risque", "attention")])
+
+    def corriger(self, items):
+        roots = []
+        for r in items:
+            how = r.get("corriger", "")
+            if how.startswith("lancer:"):
+                cmd = how[7:].split()
+                QProcess.startDetached(cmd[0], cmd[1:])
+            elif how == "ui:analyse":
+                Analyse(self).exec()
+            elif how.startswith("user:"):
+                getattr(pp, how[5:])()
+            elif how.startswith("root:"):
+                roots.append(how[5:])
+        if roots:
+            self.lancer_root(roots)
+        else:
+            self.refresh()
+
+    def lancer_root(self, actions):
+        if self.proc:
+            return
+        self.proc = QProcess(self)
+        self.bar.show()
+        self.message.setText("Correction en cours… Saisissez votre mot de passe si on vous le demande.")
+        self.fix_all.setEnabled(False)
+
+        def done(code):
+            self.proc = None
+            self.bar.hide()
+            self.message.setText("C'est corrigé." if code == 0 else
+                                 "Annulé." if code in (126, 127) else
+                                 "La correction n'a pas abouti. Vérifiez la connexion Internet et réessayez.")
+            self.refresh()
+
+        self.proc.finished.connect(lambda code, _s: done(code))
+        self.proc.errorOccurred.connect(lambda e: done(-1) if e == QProcess.ProcessError.FailedToStart else None)
+        self.proc.start("pkexec", [pp.ROOT_HELPER] + actions)
+
+
+class Analyse(QDialog):
+    """Analyses antivirus à la demande et quarantaine."""
+
+    def __init__(self, parent=None, chemins=None):
+        super().__init__(parent)
+        self.setWindowTitle("Antivirus — protect.OS")
+        self.setWindowIcon(QIcon.fromTheme("protectos-logo"))
+        self.setStyleSheet(STYLE)
+        self.resize(640, 600)
+        self.proc = None
+        self.dossier = None
+
+        titre = QLabel("<b>Analyser</b>")
+        self.choix = QButtonGroup(self)
+        self.r_rapide = QRadioButton("Analyse rapide — Téléchargements et Bureau")
+        self.r_complete = QRadioButton("Analyse complète — tout votre dossier personnel")
+        self.r_dossier = QRadioButton("Un dossier ou une clé USB…")
+        for i, r in enumerate((self.r_rapide, self.r_complete, self.r_dossier)):
+            self.choix.addButton(r, i)
+        self.r_rapide.setChecked(True)
+        self.r_dossier.toggled.connect(lambda on: on and self.choisir())
+        self.go = QPushButton(QIcon.fromTheme("security-high"), "Lancer l'analyse")
+        self.go.setObjectName("principal")
+        self.go.clicked.connect(lambda: self.lancer(self.cibles()))
+        self.bar = QProgressBar()
+        self.bar.setRange(0, 0)
+        self.bar.hide()
+        self.etat = QLabel("" if av.ready() else
+                           "L'antivirus n'est pas prêt : installez-le ou mettez à jour ses signatures "
+                           "depuis le Centre de protection.")
+        self.etat.setWordWrap(True)
+        self.resultats = QListWidget()
+        self.resultats.setMaximumHeight(110)
+        self.resultats.hide()
+
+        qtitre = QLabel("<b>Quarantaine</b> — fichiers dangereux mis à l'écart, sans danger tant qu'ils y restent")
+        qtitre.setWordWrap(True)
+        self.quar = QListWidget()
+        rest = QPushButton("Restaurer…")
+        rest.clicked.connect(self.restaurer)
+        supp = QPushButton(QIcon.fromTheme("edit-delete"), "Supprimer définitivement")
+        supp.clicked.connect(self.supprimer)
+        fermer = QPushButton("Fermer")
+        fermer.clicked.connect(self.reject)
+        row = QHBoxLayout()
+        row.addWidget(rest)
+        row.addWidget(supp)
+        row.addStretch(1)
+        row.addWidget(fermer)
+
+        lay = QVBoxLayout(self)
+        lay.setContentsMargins(20, 18, 20, 16)
+        for w in (titre, self.r_rapide, self.r_complete, self.r_dossier):
+            lay.addWidget(w)
+        go_row = QHBoxLayout()
+        go_row.addWidget(self.go)
+        go_row.addStretch(1)
+        lay.addLayout(go_row)
+        for w in (self.bar, self.etat, self.resultats):
+            lay.addWidget(w)
+        lay.addSpacing(10)
+        lay.addWidget(qtitre)
+        lay.addWidget(self.quar, 1)
+        lay.addLayout(row)
+        self.refresh_quar()
+        self.go.setEnabled(av.ready())
+        if chemins:
+            self.lancer(chemins)
+
+    def choisir(self):
+        d = QFileDialog.getExistingDirectory(self, "Dossier ou clé USB à analyser", "/media")
+        if d:
+            self.dossier = d
+            self.r_dossier.setText(f"Un dossier ou une clé USB… ({d})")
+        else:
+            self.r_rapide.setChecked(True)
+
+    def cibles(self):
+        if self.r_complete.isChecked():
+            return [av.HOME]
+        if self.r_dossier.isChecked() and self.dossier:
+            return [self.dossier]
+        return av.quick_targets() or [av.HOME]
+
+    def lancer(self, chemins):
+        if self.proc or not av.ready():
+            return
+        self.cibles_en_cours = chemins
+        self.sortie = []
+        self.go.setEnabled(False)
+        self.bar.show()
+        self.resultats.clear()
+        self.resultats.hide()
+        noms = ", ".join(c.replace(av.HOME, "~") for c in chemins)
+        self.etat.setText(f"Analyse de {noms}… Cela peut prendre plusieurs minutes.")
+        self.proc = QProcess(self)
+        self.proc.readyReadStandardOutput.connect(
+            lambda: self.sortie.append(bytes(self.proc.readAllStandardOutput()).decode(errors="replace")))
+        self.proc.finished.connect(lambda code, _s: self.fini(code))
+        self.proc.errorOccurred.connect(lambda e: self.fini(2) if e == QProcess.ProcessError.FailedToStart else None)
+        cmd = av.scan_command(chemins)
+        self.proc.start(cmd[0], cmd[1:])
+
+    def fini(self, code):
+        self.proc = None
+        self.bar.hide()
+        self.go.setEnabled(True)
+        menaces = av.parse("".join(self.sortie))
+        for path, menace in menaces:
+            e = av.quarantine(path, menace)
+            item = QListWidgetItem(QIcon.fromTheme("security-low"),
+                                   f"{os.path.basename(path)} — {menace}" + (" — mis en quarantaine" if e else ""))
+            self.resultats.addItem(item)
+        if menaces:
+            n = len(menaces)
+            self.etat.setText(f"<b style='color:#d9534f'>{n} menace{'s' if n > 1 else ''} trouvée{'s' if n > 1 else ''}"
+                              f"</b> et mise{'s' if n > 1 else ''} en quarantaine. Votre ordinateur ne risque plus rien.")
+            self.resultats.show()
+        elif code == 2:
+            self.etat.setText("L'analyse n'a pas pu se terminer (fichier illisible ou clé retirée ?).")
+        else:
+            self.etat.setText("<b style='color:#2fa86b'>✓ Aucune menace trouvée.</b>")
+        self.refresh_quar()
+
+    def refresh_quar(self):
+        self.quar.clear()
+        for e in reversed(av.list_quarantine()):
+            it = QListWidgetItem(f"{e['nom']} — {e['menace']} — {e['date']}")
+            it.setData(Qt.ItemDataRole.UserRole, e["id"])
+            it.setToolTip("Venait de : " + e["origine"])
+            self.quar.addItem(it)
+        if not self.quar.count():
+            self.quar.addItem("La quarantaine est vide.")
+
+    def selection(self):
+        it = self.quar.currentItem()
+        return it.data(Qt.ItemDataRole.UserRole) if it else None
+
+    def restaurer(self):
+        qid = self.selection()
+        if not qid:
+            return
+        if QMessageBox.warning(self, "Restaurer un fichier dangereux ?",
+                               "Ce fichier a été reconnu comme dangereux. Ne le restaurez que si vous êtes "
+                               "certain qu'il s'agit d'une erreur.",
+                               QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+                               ) == QMessageBox.StandardButton.Yes:
+            path = av.restore(qid)
+            self.etat.setText(f"Restauré dans {path}." if path else "Restauration impossible.")
+            self.refresh_quar()
+
+    def supprimer(self):
+        qid = self.selection()
+        if qid:
+            av.delete(qid)
+            self.refresh_quar()
+
+    def reject(self):
+        if self.proc:
+            self.proc.kill()
+        super().reject()
+
+
+def main():
+    app = QApplication(sys.argv)
+    app.setApplicationName("Centre de protection")
+    app.setDesktopFileName("protectos-protection")
+    if "--analyser" in sys.argv:
+        chemins = [a for a in sys.argv[sys.argv.index("--analyser") + 1:] if not a.startswith("-")]
+        chemins = [c[7:] if c.startswith("file://") else c for c in chemins]
+        return Analyse(None, chemins or None).exec()
+    w = Centre()
+    w.show()
+    return app.exec()
+
+
+if __name__ == "__main__":
+    sys.exit(main())

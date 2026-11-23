@@ -1,0 +1,10 @@
+Package: protectos-plymouth
+Version: @VERSION@
+Architecture: all
+Maintainer: @MAINTAINER@
+Section: misc
+Priority: optional
+Depends: plymouth, plymouth-label
+Description: Écran de démarrage de protect.OS
+ Thème Plymouth bleu et or : logo protect.OS, nom en or et barre de
+ progression dorée. Gère la saisie du mot de passe des disques chiffrés.

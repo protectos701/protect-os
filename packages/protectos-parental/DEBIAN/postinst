@@ -1,0 +1,15 @@
+#!/bin/sh
+set -e
+if [ "$1" = "configure" ]; then
+	mkdir -p /var/lib/protectos/parental
+	chmod 755 /var/lib/protectos /var/lib/protectos/parental
+	if command -v deb-systemd-helper >/dev/null 2>&1; then
+		deb-systemd-helper enable protectos-parental.timer >/dev/null || true
+		deb-systemd-helper enable protectos-parental-filtre.service >/dev/null || true
+	fi
+	if [ -d /run/systemd/system ]; then
+		systemctl daemon-reload >/dev/null 2>&1 || true
+		systemctl start protectos-parental.timer >/dev/null 2>&1 || true
+	fi
+fi
+exit 0

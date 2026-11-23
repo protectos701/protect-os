@@ -1,0 +1,429 @@
+#!/usr/bin/python3
+"""Installateur de protect.OS : double-cliquez sur un .exe, un .msi ou un .deb.
+
+Programmes Windows : même déroulé que sous Windows (l'installateur du programme s'ouvre,
+il copie ses fichiers dans C:\\Program Files, crée ses raccourcis et s'inscrit dans
+« Programmes et fonctionnalités »). Un .exe sans installateur peut être ajouté au menu
+comme programme portable. Paquets .deb : installés avec leurs dépendances par APT.
+"""
+import os
+import sys
+import tempfile
+
+sys.path.insert(0, "/usr/lib/protectos")
+import protectos_programmes as vp  # noqa: E402
+
+from PyQt6.QtCore import QProcess, QProcessEnvironment, Qt  # noqa: E402
+from PyQt6.QtGui import QIcon, QPixmap, QFont  # noqa: E402
+from PyQt6.QtWidgets import (  # noqa: E402
+    QApplication, QDialog, QFileDialog, QHBoxLayout, QLabel, QMessageBox, QPlainTextEdit,
+    QProgressBar, QPushButton, QStackedWidget, QVBoxLayout, QWidget)
+
+
+class Installer(QDialog):
+    def __init__(self, path):
+        super().__init__()
+        self.path = os.path.abspath(path)
+        self.kind = vp.kind_of(self.path)
+        self.proc = None
+        self.before = set()
+        self.setWindowTitle("Installateur protect.OS")
+        self.setWindowIcon(QIcon.fromTheme("protectos-logo"))
+        self.setMinimumWidth(560)
+
+        if self.kind == "deb":
+            self.info = vp.deb_info(self.path)
+        else:
+            self.info = vp.exe_info(self.path)
+
+        # En-tête : icône du programme, nom, éditeur
+        self.tmp = tempfile.TemporaryDirectory()
+        icon = QIcon.fromTheme("application-x-ms-dos-executable" if self.kind != "deb"
+                               else "application-x-deb", QIcon.fromTheme("protectos-logo"))
+        png = os.path.join(self.tmp.name, "icone.png")
+        pix = QPixmap(png) if self.kind != "deb" and vp.extract_icon(self.path, png) else icon.pixmap(64, 64)
+        logo = QLabel()
+        logo.setPixmap(pix.scaled(64, 64, Qt.AspectRatioMode.KeepAspectRatio,
+                                  Qt.TransformationMode.SmoothTransformation))
+        logo.setFixedSize(72, 72)
+        logo.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+        title = QLabel(self.info["nom"])
+        f = QFont(title.font())
+        f.setPointSizeF(f.pointSizeF() * 1.45)
+        f.setBold(True)
+        title.setFont(f)
+        title.setWordWrap(True)
+        details = []
+        details.append("Paquet Linux (.deb)" if self.kind == "deb" else
+                       "Installateur Windows (.msi)" if self.kind == "msi" else "Programme Windows")
+        if self.info.get("editeur"):
+            details.append("Éditeur : " + self.info["editeur"])
+        if self.info.get("version"):
+            details.append("Version " + self.info["version"])
+        sub = QLabel(" · ".join(details))
+        sub.setWordWrap(True)
+        fname = QLabel(os.path.basename(self.path))
+        fname.setEnabled(False)  # texte grisé
+
+        head_text = QVBoxLayout()
+        head_text.addWidget(title)
+        head_text.addWidget(sub)
+        head_text.addWidget(fname)
+        head = QHBoxLayout()
+        head.addWidget(logo, 0, Qt.AlignmentFlag.AlignTop)
+        head.addLayout(head_text, 1)
+
+        # Pages : confirmation → progression → résultat
+        self.pages = QStackedWidget()
+        self.pages.addWidget(self._page_confirm())
+        self.pages.addWidget(self._page_progress())
+        self.pages.addWidget(self._page_result())
+        self.pages.addWidget(self._page_components())
+        self.after_components = None
+        self.missing = []
+
+        lay = QVBoxLayout(self)
+        lay.setContentsMargins(22, 20, 22, 18)
+        lay.setSpacing(16)
+        lay.addLayout(head)
+        lay.addWidget(self.pages)
+
+    # ------------------------------------------------------------ pages
+    def _page_confirm(self):
+        w = QWidget()
+        v = QVBoxLayout(w)
+        v.setContentsMargins(0, 0, 0, 0)
+        if self.kind == "deb":
+            msg = ("Ce paquet va être installé pour tous les utilisateurs de l'ordinateur. "
+                   "Votre mot de passe vous sera demandé.")
+        else:
+            msg = ("L'installateur du programme va s'ouvrir, comme sous Windows. Il placera ses fichiers "
+                   "dans le disque C: de protect.OS et ses raccourcis dans le menu Démarrer.\n\n"
+                   "N'installez que des programmes venant de sources de confiance.")
+            if not vp.wine_available():
+                msg = ("La compatibilité Windows n'est pas installée. "
+                       "Installez le paquet « wine » puis réessayez.")
+            elif not vp.support_32bits():
+                msg += ("\n\nAttention : la partie 32 bits de la compatibilité Windows n'est pas installée. "
+                        "Beaucoup de programmes en ont besoin : activez-la dans « Programmes et fonctionnalités ».")
+        lab = QLabel(msg)
+        lab.setWordWrap(True)
+        v.addWidget(lab)
+        v.addStretch(1)
+        row = QHBoxLayout()
+        if self.kind in ("windows",):
+            run = QPushButton("Ouvrir sans installer")
+            run.clicked.connect(self.run_only)
+            row.addWidget(run)
+        row.addStretch(1)
+        cancel = QPushButton("Annuler")
+        cancel.clicked.connect(self.reject)
+        self.go = QPushButton("Installer")
+        self.go.setDefault(True)
+        self.go.setIcon(QIcon.fromTheme("run-install"))
+        self.go.clicked.connect(self.start)
+        if self.kind != "deb" and not vp.wine_available():
+            self.go.setEnabled(False)
+        row.addWidget(cancel)
+        row.addWidget(self.go)
+        v.addLayout(row)
+        return w
+
+    def _page_progress(self):
+        w = QWidget()
+        v = QVBoxLayout(w)
+        v.setContentsMargins(0, 0, 0, 0)
+        self.status = QLabel("")
+        self.status.setWordWrap(True)
+        bar = QProgressBar()
+        bar.setRange(0, 0)
+        self.log = QPlainTextEdit()
+        self.log.setReadOnly(True)
+        self.log.setMaximumBlockCount(2000)
+        self.log.setVisible(self.kind == "deb")
+        self.log.setMinimumHeight(140)
+        v.addWidget(self.status)
+        v.addWidget(bar)
+        v.addWidget(self.log, 1)
+        return w
+
+    def _page_result(self):
+        w = QWidget()
+        v = QVBoxLayout(w)
+        v.setContentsMargins(0, 0, 0, 0)
+        self.result = QLabel("")
+        self.result.setWordWrap(True)
+        v.addWidget(self.result)
+        v.addStretch(1)
+        row = QHBoxLayout()
+        self.add_menu = QPushButton("Ajouter au menu Démarrer")
+        self.add_menu.setIcon(QIcon.fromTheme("list-add"))
+        self.add_menu.clicked.connect(self.add_portable)
+        self.add_menu.hide()
+        self.quar_btn = QPushButton(QIcon.fromTheme("security-high"), "Mettre en quarantaine")
+        self.quar_btn.clicked.connect(self._quarantine)
+        self.quar_btn.hide()
+        progs = QPushButton("Programmes et fonctionnalités")
+        progs.clicked.connect(lambda: QProcess.startDetached("protectos-programmes", []))
+        close = QPushButton("Fermer")
+        close.setDefault(True)
+        close.clicked.connect(self.accept)
+        row.addWidget(self.add_menu)
+        row.addWidget(self.quar_btn)
+        row.addStretch(1)
+        row.addWidget(progs)
+        row.addWidget(close)
+        v.addLayout(row)
+        return w
+
+    def _page_components(self):
+        w = QWidget()
+        v = QVBoxLayout(w)
+        v.setContentsMargins(0, 0, 0, 0)
+        self.comp_text = QLabel("")
+        self.comp_text.setWordWrap(True)
+        self.comp_text.setTextFormat(Qt.TextFormat.RichText)
+        v.addWidget(self.comp_text)
+        v.addStretch(1)
+        row = QHBoxLayout()
+        cancel = QPushButton("Annuler")
+        cancel.clicked.connect(self.reject)
+        self.comp_skip = QPushButton("Continuer sans")
+        self.comp_skip.clicked.connect(self._skip_components)
+        self.comp_add = QPushButton("Ajouter puis continuer")
+        self.comp_add.setIcon(QIcon.fromTheme("run-install"))
+        self.comp_add.setDefault(True)
+        self.comp_add.clicked.connect(self._add_components)
+        row.addWidget(cancel)
+        row.addStretch(1)
+        row.addWidget(self.comp_skip)
+        row.addWidget(self.comp_add)
+        v.addLayout(row)
+        return w
+
+    # ------------------------------------------------------------ déroulé
+    def _env(self):
+        env = QProcessEnvironment.systemEnvironment()
+        for k, val in vp.wine_env().items():
+            env.insert(k, val)
+        return env
+
+    def _run(self, cmd, then, status):
+        self.status.setText(status)
+        p = QProcess(self)
+        self.proc = p
+        p.setProcessEnvironment(self._env())
+        p.setProcessChannelMode(QProcess.ProcessChannelMode.MergedChannels)
+        p.readyReadStandardOutput.connect(
+            lambda: self.log.appendPlainText(bytes(p.readAllStandardOutput()).decode(errors="replace").rstrip()))
+        p.finished.connect(lambda code, _status: then(code))
+        p.errorOccurred.connect(lambda e: then(-1) if e == QProcess.ProcessError.FailedToStart else None)
+        p.start(cmd[0], cmd[1:])
+
+    def start(self):
+        self.pages.setCurrentIndex(1)
+        if self.kind == "deb":
+            self._run(vp.install_command(self.path), self.deb_done,
+                      f"Installation de « {self.info['nom']} »… Saisissez votre mot de passe si on vous le demande.")
+            return
+        self.before = {p["id"] for p in vp.windows_programs()}
+        self._scan_then(lambda: self._prepare(lambda: self._check_components(self.launch, "installer")))
+
+    def _prepare(self, then):
+        """Crée le disque C: la première fois, puis continue."""
+        self.pages.setCurrentIndex(1)
+        if not vp.prefix_ready():
+            self._run(["wine", "wineboot", "--init"], lambda _c: self._wait_server(then),
+                      "Préparation du disque C: (la première fois seulement, environ une minute)…")
+        else:
+            then()
+
+    def _check_components(self, then, action):
+        """Comme sous Windows, certains programmes exigent .NET, Visual C++ ou DirectX : on les propose."""
+        self.missing = vp.missing_components(self.path)
+        if not self.missing:
+            then()
+            return
+        self.after_components = then
+        names = ", ".join(vp.COMPONENT_NAMES[v] for v in self.missing)
+        what = "l'installer" if action == "installer" else "l'ouvrir"
+        text = f"<b>Ce programme a besoin de : {names}.</b><br><br>"
+        if vp.winetricks_available():
+            text += (f"protect.OS peut ajouter ces composants Windows au disque C: avant de {what}. "
+                     "Comptez quelques minutes (jusqu'à 15 pour .NET), avec une connexion Internet.")
+            self.comp_add.setEnabled(True)
+        else:
+            text += ("L'outil des composants Windows n'est pas encore installé : ouvrez « Programmes et "
+                     "fonctionnalités » → Plus → Composants Windows pour l'ajouter. Vous pouvez aussi "
+                     "continuer sans, mais le programme risque de ne pas démarrer.")
+            self.comp_add.setEnabled(False)
+        self.comp_skip.setText("Installer sans" if action == "installer" else "Ouvrir sans")
+        self.comp_text.setText(text)
+        self.pages.setCurrentIndex(3)
+
+    def _skip_components(self):
+        self.pages.setCurrentIndex(1)
+        self.after_components()
+
+    def _add_components(self):
+        self.pages.setCurrentIndex(1)
+        self.log.show()
+        names = ", ".join(vp.COMPONENT_NAMES[v] for v in self.missing)
+
+        def done(code):
+            if code != 0:
+                self.log.appendPlainText("Les composants n'ont pas tous pu être ajoutés ; on continue quand même.")
+            self.log.setVisible(self.kind == "deb")
+            self._wait_server(self.after_components)
+
+        self._run(vp.winetricks_command(self.missing), done,
+                  f"Ajout de {names}… Cela peut prendre plusieurs minutes, des fenêtres peuvent s'ouvrir.")
+
+    def _wait_server(self, then):
+        self._run([vp.wineserver(), "-w"], lambda _c: then(), self.status.text())
+
+    def launch(self):
+        self._run(vp.install_command(self.path), lambda _c: self._wait_server(self.windows_done),
+                  f"Installation de « {self.info['nom']} »… Suivez les étapes de l'installateur.")
+
+    def windows_done(self):
+        vp.refresh_menu()
+        new = [p for p in vp.windows_programs() if p["id"] not in self.before]
+        self.pages.setCurrentIndex(2)
+        if new:
+            names = ", ".join(f"« {p['nom']} »" for p in new)
+            self.result.setText(f"<b>Installation terminée.</b><br><br>{names} "
+                                f"{'est installé' if len(new) == 1 else 'sont installés'}. "
+                                "Vous le retrouverez dans le menu Démarrer, rubrique « Wine », et dans "
+                                "« Programmes et fonctionnalités » pour le désinstaller.")
+        else:
+            self.result.setText("<b>Aucun nouveau programme n'a été enregistré.</b><br><br>"
+                                "Soit l'installation a été annulée, soit ce programme est « portable » : "
+                                "il fonctionne sans installation. Vous pouvez l'ajouter au menu Démarrer "
+                                "pour le retrouver facilement.")
+            self.add_menu.setVisible(self.kind == "windows")
+
+    def deb_done(self, code):
+        self.pages.setCurrentIndex(2)
+        if code == 0:
+            self.result.setText(f"<b>Installation terminée.</b><br><br>« {self.info['nom']} » est installé. "
+                                "Vous le trouverez dans le menu Démarrer.")
+            vp.refresh_menu()
+        elif code in (126, 127):
+            self.result.setText("<b>Installation annulée.</b><br><br>Le mot de passe n'a pas été saisi.")
+        else:
+            self.result.setText("<b>L'installation a échoué.</b><br><br>Le détail est affiché ci-dessous : "
+                                "il manque souvent une dépendance introuvable dans les dépôts.")
+            self.pages.widget(2).layout().insertWidget(1, self.log)
+            self.log.show()
+
+    def run_only(self):
+        def suite():
+            if vp.prefix_ready() and not vp.missing_components(self.path):
+                self._open_detached()
+            else:
+                self._prepare(lambda: self._check_components(self._open_detached, "ouvrir"))
+        self._scan_then(suite)
+
+    # ------------------------------------------------------------ antivirus
+    def _scan_then(self, then):
+        """Analyse le programme avec l'antivirus de protect.OS avant de l'installer ou de l'ouvrir."""
+        try:
+            sys.path.insert(0, "/usr/lib/protectos")
+            import protectos_antivirus as av
+        except ImportError:
+            then()
+            return
+        if not av.ready():
+            then()
+            return
+        self.av = av
+        self.pages.setCurrentIndex(1)
+        self.status.setText("Analyse antivirus du programme…")
+        out = []
+        p = QProcess(self)
+        self.proc = p
+
+        def done(_code):
+            menaces = av.parse("".join(out))
+            if menaces:
+                self._blocked(menaces[0][1])
+            else:
+                then()
+
+        p.readyReadStandardOutput.connect(lambda: out.append(bytes(p.readAllStandardOutput()).decode(errors="replace")))
+        p.finished.connect(lambda code, _s: done(code))
+        p.errorOccurred.connect(lambda e: then() if e == QProcess.ProcessError.FailedToStart else None)
+        cmd = av.scan_command([self.path])
+        p.start(cmd[0], cmd[1:])
+
+    def _blocked(self, menace):
+        self.proc = None
+        self.menace = menace
+        self.pages.setCurrentIndex(2)
+        self.result.setText("<b style='color:#d9534f'>Programme bloqué : il contient une menace.</b><br><br>"
+                            f"L'antivirus de protect.OS a détecté <b>{menace}</b> dans ce fichier. "
+                            "Il n'a pas été installé ni ouvert. Supprimez-le, ou mettez-le en quarantaine.")
+        self.add_menu.hide()
+        self.quar_btn.show()
+
+    def _quarantine(self):
+        e = self.av.quarantine(self.path, self.menace)
+        self.quar_btn.hide()
+        self.result.setText("<b>Fichier mis en quarantaine.</b><br><br>Il ne peut plus faire de mal. "
+                            "Vous le retrouverez dans le Centre de protection → Antivirus." if e else
+                            "Le fichier n'a pas pu être déplacé.")
+
+    def _open_detached(self):
+        p = QProcess(self)
+        p.setProgram("wine")
+        p.setArguments([self.path])
+        p.setProcessEnvironment(self._env())
+        p.setWorkingDirectory(os.path.dirname(self.path))
+        p.startDetached()
+        self.accept()
+
+    def add_portable(self):
+        entry = vp.add_portable(self.path, self.info["nom"], self.info.get("editeur", ""),
+                                self.info.get("version", ""))
+        vp.refresh_menu()
+        self.add_menu.hide()
+        self.result.setText(f"<b>« {entry['nom']} » est dans le menu Démarrer.</b><br><br>"
+                            f"Il est rangé dans {entry['dossier']}. Vous pouvez le retirer depuis "
+                            "« Programmes et fonctionnalités ».")
+
+    def reject(self):
+        if self.proc and self.proc.state() != QProcess.ProcessState.NotRunning:
+            return  # pas de fermeture pendant une installation
+        super().reject()
+
+
+def main():
+    app = QApplication(sys.argv)
+    app.setApplicationName("Installateur protect.OS")
+    app.setDesktopFileName("protectos-installer")
+    files = [a for a in sys.argv[1:] if not a.startswith("-")]
+    if not files:
+        path, _ = QFileDialog.getOpenFileName(
+            None, "Choisir un programme à installer", os.path.expanduser("~/Téléchargements"),
+            "Programmes (*.exe *.msi *.deb *.EXE *.MSI);;Tous les fichiers (*)")
+        if not path:
+            return 0
+        files = [path]
+    path = files[0]
+    if path.startswith("file://"):
+        from urllib.parse import unquote, urlparse
+        path = unquote(urlparse(path).path)
+    if not os.path.isfile(path) or vp.kind_of(path) is None:
+        QMessageBox.warning(None, "Installateur protect.OS",
+                            "Ce fichier n'est pas un programme que protect.OS sait installer "
+                            "(.exe, .msi ou .deb).")
+        return 1
+    dlg = Installer(path)
+    dlg.show()
+    return app.exec()
+
+
+if __name__ == "__main__":
+    sys.exit(main())

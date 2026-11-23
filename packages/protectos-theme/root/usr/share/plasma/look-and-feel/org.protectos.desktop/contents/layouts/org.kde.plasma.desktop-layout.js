@@ -1,0 +1,45 @@
+// Disposition par défaut de protect.OS :
+// une barre des tâches flottante en bas, avec le menu et les applications au centre (façon Windows 11).
+
+var panel = new Panel;
+panel.location = "bottom";
+panel.height = 2 * Math.floor(gridUnit * 2.6 / 2);
+
+// Espace extensible à gauche : pousse le menu et les icônes vers le centre (barre centrée)
+panel.addWidget("org.kde.plasma.panelspacer"); // barre-centree
+
+// Menu Démarrer avec le logo protect.OS
+var kickoff = panel.addWidget("org.kde.plasma.kickoff");
+kickoff.currentConfigGroup = ["General"];
+kickoff.writeConfig("icon", "protectos-start");
+kickoff.writeConfig("favoritesPortedToKAstats", "true");
+
+// Applications épinglées
+var tasks = panel.addWidget("org.kde.plasma.icontasks");
+tasks.currentConfigGroup = ["General"];
+tasks.writeConfig("launchers", [
+    "applications:org.kde.dolphin.desktop",
+    "applications:firefox-esr.desktop",
+    "applications:org.kde.konsole.desktop",
+    "applications:libreoffice-writer.desktop",
+    "applications:org.kde.discover.desktop",
+    "applications:systemsettings.desktop"
+]);
+
+// Espace extensible à droite
+panel.addWidget("org.kde.plasma.panelspacer");
+
+panel.addWidget("org.kde.plasma.systemtray");
+var clock = panel.addWidget("org.kde.plasma.digitalclock");
+clock.currentConfigGroup = ["Appearance"];
+clock.writeConfig("showDate", "true");
+clock.writeConfig("dateFormat", "shortDate");
+panel.addWidget("org.kde.plasma.showdesktop");
+
+// Fond d'écran protect.OS sur tous les bureaux
+var desktopsArray = desktopsForActivity(currentActivity());
+for (var j = 0; j < desktopsArray.length; j++) {
+    desktopsArray[j].wallpaperPlugin = "org.kde.image";
+    desktopsArray[j].currentConfigGroup = ["Wallpaper", "org.kde.image", "General"];
+    desktopsArray[j].writeConfig("Image", "file:///usr/share/wallpapers/ProtectOS/");
+}

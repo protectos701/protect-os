@@ -1,0 +1,16 @@
+#!/bin/sh
+# Installe winetricks, l'outil des composants Windows (lancé via pkexec).
+# winetricks est dans la section « contrib » de Debian : on l'ajoute si elle manque.
+set -e
+export DEBIAN_FRONTEND=noninteractive
+if ! grep -rqsE -- "^[^#]*(^|[[:space:]])contrib([[:space:]]|\$)" /etc/apt/sources.list /etc/apt/sources.list.d/; then
+	cat > /etc/apt/sources.list.d/protectos-contrib.sources <<SRC
+Types: deb
+URIs: http://deb.debian.org/debian
+Suites: trixie trixie-updates
+Components: contrib
+Signed-By: /usr/share/keyrings/debian-archive-keyring.gpg
+SRC
+fi
+apt-get update
+apt-get install -y winetricks cabextract

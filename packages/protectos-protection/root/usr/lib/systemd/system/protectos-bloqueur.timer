@@ -1,0 +1,11 @@
+[Unit]
+Description=protect.OS : mise à jour hebdomadaire du bloqueur de publicités et de traqueurs
+
+[Timer]
+OnBootSec=10min
+OnUnitActiveSec=7d
+Persistent=true
+RandomizedDelaySec=1h
+
+[Install]
+WantedBy=timers.target

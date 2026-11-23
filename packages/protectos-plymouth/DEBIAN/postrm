@@ -1,0 +1,9 @@
+#!/bin/sh
+set -e
+if [ "$1" = "remove" ] && command -v plymouth-set-default-theme >/dev/null 2>&1; then
+	if [ "$(plymouth-set-default-theme 2>/dev/null)" = "protectos" ]; then
+		plymouth-set-default-theme --reset || true
+		command -v update-initramfs >/dev/null 2>&1 && update-initramfs -u || true
+	fi
+fi
+exit 0

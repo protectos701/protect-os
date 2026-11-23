@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+<defs>
+  <linearGradient id="fond" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0" stop-color="#2a4fb8"/><stop offset="0.55" stop-color="#16307a"/><stop offset="1" stop-color="#0a1a52"/>
+  </linearGradient>
+  <linearGradient id="or" gradientUnits="userSpaceOnUse" x1="0" y1="10" x2="0" y2="54">
+    <stop offset="0" stop-color="#f3d27a"/><stop offset="1" stop-color="#d4a72c"/>
+  </linearGradient>
+  <linearGradient id="reflet" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0" stop-color="#ffffff" stop-opacity="0.32"/><stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+  </linearGradient>
+  <linearGradient id="dos" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0" stop-color="#16307a"/><stop offset="1" stop-color="#0a1a52"/>
+  </linearGradient>
+</defs>
+<path d="M24 20 L28 12 L34 18 L40 11 L42 20" fill="#f3d27a" stroke="#9c7414" stroke-width="1"/><path d="M15 21 H49 L45 55 Q44.5 58 41.5 58 H22.5 Q19.5 58 19 55 Z" fill="url(#fond)"/>
+<path d="M15.8 21.8 H48.2" stroke="#d4a72c" stroke-width="1.6"/>
+<path d="M16 22 H48 L47 32 Q32 36 17 32 Z" fill="url(#reflet)"/>
+<path d="M26 28 L27 51 M32 28 V51 M38 28 L37 51" stroke="#d4a72c" stroke-width="2.4" stroke-linecap="round"/>
+<rect x="11" y="15" width="42" height="6" rx="3" fill="url(#or)"/><rect x="27" y="11" width="10" height="5" rx="2" fill="url(#or)"/>
+</svg>

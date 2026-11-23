@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+<defs>
+  <linearGradient id="fond" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0" stop-color="#2a4fb8"/><stop offset="0.55" stop-color="#16307a"/><stop offset="1" stop-color="#0a1a52"/>
+  </linearGradient>
+  <linearGradient id="or" gradientUnits="userSpaceOnUse" x1="0" y1="10" x2="0" y2="54">
+    <stop offset="0" stop-color="#f3d27a"/><stop offset="1" stop-color="#d4a72c"/>
+  </linearGradient>
+  <linearGradient id="reflet" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0" stop-color="#ffffff" stop-opacity="0.32"/><stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+  </linearGradient>
+  <linearGradient id="dos" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0" stop-color="#16307a"/><stop offset="1" stop-color="#0a1a52"/>
+  </linearGradient>
+</defs>
+<path d="M6 16 Q6 11 11 11 H25 L30 16 H53 Q58 16 58 21 V48 Q58 53 53 53 H11 Q6 53 6 48 Z" fill="url(#dos)"/>
+<path d="M6 24 Q6 20 10 20 H54 Q58 20 58 24 V49 Q58 54 53 54 H11 Q6 54 6 49 Z" fill="url(#fond)"/>
+<path d="M6.8 24 Q6.8 20.8 10 20.8 H54 Q57.2 20.8 57.2 24" fill="none" stroke="#d4a72c" stroke-width="1.6"/>
+<path d="M7 25 Q7 21 11 21 H53 Q57 21 57 25 V31 Q32 37 7 31 Z" fill="url(#reflet)"/>
+<g transform="translate(32 38) scale(0.52) translate(-32 -32)" fill="url(#or)" stroke="url(#or)" stroke-linecap="round" stroke-linejoin="round"><path d="M19 13 H38 L46 21 V50 H19 Z" fill="none" stroke-width="3.2"/><path d="M25 28 H40 M25 34 H40 M25 40 H34" fill="none" stroke-width="3.2"/></g>
+</svg>

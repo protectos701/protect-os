@@ -173,8 +173,8 @@ def fichiers_texte():
     for d in SCOPE_DIRS:
         for dp, _dn, fn in os.walk(os.path.join(ROOT, d)):
             for f in fn:
-                if not f.lower().endswith(SKIP_EXT):
-                    out.append(os.path.join(dp, f))
+                if not f.lower().endswith(SKIP_EXT) and not os.path.islink(os.path.join(dp, f)):
+                    out.append(os.path.join(dp, f))  # un lien n'est pas recoloré (sa cible l'est déjà)
     out += [os.path.join(ROOT, f) for f in SCOPE_FILES if os.path.isfile(os.path.join(ROOT, f))]
     res = []
     for p in out:

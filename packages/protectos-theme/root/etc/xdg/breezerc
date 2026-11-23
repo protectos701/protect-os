@@ -1,3 +1,15 @@
 # Menus en verre : translucides et floutés derrière
 [Style]
 MenuOpacity=82
+
+# Fenêtres : ombre profonde et douce, contour discret, bouton Fermer entouré
+[Common]
+OutlineIntensity=OutlineLow
+ShadowSize=ShadowLarge
+ShadowStrength=200
+ShadowColor=4,8,24
+
+[Windeco]
+OutlineCloseButton=true
+DrawTitleBarSeparator=false
+ButtonSize=ButtonDefault

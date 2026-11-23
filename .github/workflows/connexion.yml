@@ -1,0 +1,54 @@
+# Vérifie que l'écran de connexion de protect.OS se charge sans erreur et en fait une capture.
+name: Écran de connexion
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "packages/protectos-theme/root/usr/share/sddm/**"
+      - ".github/workflows/connexion.yml"
+
+jobs:
+  connexion:
+    runs-on: ubuntu-latest
+    container: debian:trixie
+    steps:
+      - name: Outils
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends sddm xvfb x11-apps imagemagick python3-pil \
+            qml6-module-qtquick qml6-module-qtquick-window qml6-module-qtqml-workerscript fonts-noto-core
+      - uses: actions/checkout@v4
+      - name: Afficher l'écran de connexion
+        shell: bash
+        run: |
+          cp -r packages/protectos-theme/root/usr/share/sddm/themes/protectos /usr/share/sddm/themes/
+          mkdir -p /usr/share/wallpapers/ProtectOS/contents/images
+          cp packages/protectos-wallpapers/root/usr/share/wallpapers/ProtectOS/contents/images/1920x1080.png \
+             /usr/share/wallpapers/ProtectOS/contents/images/
+          useradd -m -c "Anthony" anthony; useradd -m -c "Léa" lea
+          Xvfb :99 -screen 0 1920x1080x24 & sleep 3
+          GREETER=$(command -v sddm-greeter-qt6 || command -v sddm-greeter)
+          echo "Greeter : $GREETER"
+          DISPLAY=:99 LANG=fr_FR.UTF-8 "$GREETER" --test-mode --theme /usr/share/sddm/themes/protectos > greeter.log 2>&1 &
+          sleep 12
+          xwd -root -display :99 -silent | convert xwd:- connexion.png
+          echo "----- journal de l'écran de connexion -----"; cat greeter.log
+          python3 - <<'PY'
+          from PIL import Image
+          im = Image.open("connexion.png").convert("RGB").resize((480, 270))
+          px = list(im.getdata()); n = len(px)
+          noir = sum(1 for r, g, b in px if r + g + b < 30) / n
+          bleu = sum(1 for r, g, b in px if b > r + 20 and b > g) / n
+          orr = sum(1 for r, g, b in px if r > 150 and g > 110 and b < 110) / n
+          print(f"Capture : {bleu:.0%} de bleu, {orr:.1%} d'or, {noir:.0%} de noir")
+          PY
+          if grep -Eq "\.qml:[0-9]+.*(error|Error|is not a type|not defined|Cannot|Unable)" greeter.log; then
+            echo "::error::L'écran de connexion contient une erreur (voir le journal ci-dessus)"; exit 1
+          fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ecran-connexion
+          path: connexion.png

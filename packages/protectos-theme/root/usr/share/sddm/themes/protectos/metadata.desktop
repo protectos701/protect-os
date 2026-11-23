@@ -1,0 +1,13 @@
+[SddmGreeterTheme]
+Name=protect.OS
+Description=Écran de connexion de protect.OS
+Author=protect.OS
+Type=sddm-theme
+Version=1.0
+Website=https://protectos701.github.io/protect-os
+Screenshot=
+MainScript=Main.qml
+ConfigFile=theme.conf
+Theme-Id=protectos
+Theme-API=2.0
+QtVersion=6

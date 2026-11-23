@@ -27,11 +27,12 @@ jobs:
           mkdir -p /usr/share/wallpapers/ProtectOS/contents/images
           cp packages/protectos-wallpapers/root/usr/share/wallpapers/ProtectOS/contents/images/1920x1080.png \
              /usr/share/wallpapers/ProtectOS/contents/images/
+          ls -la /usr/share/sddm/themes/protectos; head -3 /usr/share/sddm/themes/protectos/Main.qml | od -c | head -3
           useradd -m -c "Anthony" anthony; useradd -m -c "Léa" lea
           Xvfb :99 -screen 0 1920x1080x24 & sleep 3
           GREETER=$(command -v sddm-greeter-qt6 || command -v sddm-greeter)
           echo "Greeter : $GREETER"
-          DISPLAY=:99 LANG=fr_FR.UTF-8 "$GREETER" --test-mode --theme /usr/share/sddm/themes/protectos > greeter.log 2>&1 &
+          DISPLAY=:99 QML_IMPORT_TRACE=0 QT_LOGGING_RULES="qt.qml*=true" "$GREETER" --test-mode --theme /usr/share/sddm/themes/protectos > greeter.log 2>&1 &
           sleep 12
           xwd -root -display :99 -silent | convert xwd:- connexion.png
           echo "----- journal de l'écran de connexion -----"; cat greeter.log

@@ -24,7 +24,7 @@ import time
 
 APPEND = ("boot=live components splash hostname=protectos username=protect "
           "locales=fr_FR.UTF-8 keyboard-layouts=fr timezone=Europe/Paris "
-          "systemd.show_status=1 console=tty1 console=ttyS0,115200")
+          "systemd.show_status=1 systemd.journald.forward_to_console=1 console=tty1 console=ttyS0,115200")
 GRAPHICAL = re.compile(r"Graphical Interface|graphical\.target")
 FATAL = re.compile(r"Kernel panic|Unable to find a medium containing a live file system|"
                    r"emergency mode|Failed to start .*Display Manager", re.I)
@@ -268,6 +268,18 @@ def main():
     for nom, png in etapes:
         if png and png.endswith(".png") and os.path.exists(png):
             apercu(nom, png)
+    # Messages de Plasma utiles au diagnostic (le journal est recopié sur la sortie série)
+    try:
+        lignes = open(serial, encoding="utf-8", errors="replace").read().splitlines()
+        motif = re.compile(r"systemmonitor|ksysguard|ksystemstats|sensorface|protectos\.moniteur|"
+                           r"plasmashell.*(error|Error|not installed|failed|Cannot)", re.I)
+        utiles = [l[-220:] for l in lignes if motif.search(l)]
+        if utiles:
+            print("----- Journal de Plasma (extraits) -----")
+            for l in utiles[:80]:
+                print(l)
+    except OSError:
+        pass
     ok = graphical_at is not None and fatal is None and last.get("noir", 0) < 0.9
     result = {
         "bureau_demarre": ok,

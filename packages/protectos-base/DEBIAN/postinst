@@ -21,6 +21,15 @@ activer_pare_feu() {
 	touch "$FLAG"
 }
 
+# Photo de profil des nouveaux comptes : le bouclier protect.OS (au lieu du logo Debian de desktop-base)
+avatar() {
+	[ -f /usr/share/protectos/avatar.png ] || return 0
+	mkdir -p /etc/skel
+	cp -f /usr/share/protectos/avatar.png /etc/skel/.face
+	rm -f /etc/skel/.face.icon
+	ln -s .face /etc/skel/.face.icon
+}
+
 # Texte des écrans de connexion en mode texte (Ctrl+Alt+F2…)
 identite_texte() {
 	printf 'protect.OS \\l\n\n' > /etc/issue
@@ -30,6 +39,7 @@ identite_texte() {
 case "$1" in
 	configure)
 		identite_texte
+		avatar
 		activer_pare_feu
 		/usr/lib/protectos/protectos-identite tout || true
 		if command -v deb-systemd-helper >/dev/null 2>&1; then
@@ -43,6 +53,7 @@ case "$1" in
 	triggered)
 		activer_pare_feu
 		identite_texte
+		avatar
 		/usr/lib/protectos/protectos-identite applications || true
 		/usr/lib/protectos/protectos-identite sessions || true
 		/usr/lib/protectos/protectos-identite traductions || true

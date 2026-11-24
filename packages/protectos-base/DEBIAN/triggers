@@ -8,3 +8,5 @@ interest-noawait /usr/share/xsessions
 interest-noawait /etc/issue
 # Réappliquer les noms quand une mise à jour remplace les traductions
 interest-noawait /usr/share/locale
+# Remettre la photo de profil protect.OS si un paquet remet la sienne
+interest-noawait /etc/skel/.face

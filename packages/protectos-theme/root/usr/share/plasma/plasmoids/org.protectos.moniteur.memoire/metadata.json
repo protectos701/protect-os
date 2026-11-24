@@ -1,0 +1,25 @@
+{
+    "KPackageStructure": "Plasma/Applet",
+    "KPlugin": {
+        "Authors": [
+            {
+                "Name": "protect.OS"
+            }
+        ],
+        "Category": "System Information",
+        "Description": "Mémoire vive utilisée",
+        "EnabledByDefault": true,
+        "FormFactors": [
+            "desktop"
+        ],
+        "Icon": "memory",
+        "Id": "org.protectos.moniteur.memoire",
+        "License": "GPL-2.0+",
+        "Name": "Mémoire"
+    },
+    "X-Plasma-API-Minimum-Version": "6.0",
+    "X-Plasma-Provides": [
+        "org.kde.plasma.systemmonitor"
+    ],
+    "X-Plasma-RootPath": "org.kde.plasma.systemmonitor"
+}

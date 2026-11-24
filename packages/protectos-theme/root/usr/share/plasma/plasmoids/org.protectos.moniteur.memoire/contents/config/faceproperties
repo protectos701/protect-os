@@ -1,0 +1,7 @@
+[Config]
+chartFace=org.kde.ksysguard.piechart
+highPrioritySensorIds=["memory/physical/usedPercent"]
+totalSensors=["memory/physical/usedPercent"]
+lowPrioritySensorIds=["memory/physical/used", "memory/physical/total"]
+
+[FaceConfig]

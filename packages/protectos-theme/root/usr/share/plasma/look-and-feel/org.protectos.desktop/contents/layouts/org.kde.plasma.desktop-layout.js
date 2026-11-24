@@ -60,25 +60,14 @@ var moniteur = true; // moniteur-bureau
 if (moniteur && desktopsArray.length > 0) {
     var bureau = desktopsArray[0];
     var ecran = screenGeometry(bureau.screen);
-    var jauges = [
-        ["Processeur", "cpu/all/usage", '["cpu/all/averageTemperature","cpu/all/averageFrequency"]'],
-        ["Carte graphique", "gpu/gpu0/usage", '["gpu/gpu0/temperature","gpu/gpu0/usedVram"]'],
-        ["Mémoire", "memory/physical/usedPercent", '["memory/physical/used","memory/physical/total"]'],
-        ["Disque", "disk/all/usedPercent", '["disk/all/free","disk/all/total"]']
-    ];
-    var largeur = 230, hauteur = 190, marge = 14;
-    var x = ecran.width - largeur - 36;
-    var y = Math.max(40, Math.floor((ecran.height - 60 - jauges.length * (hauteur + marge)) / 2));
+    // Jauges préréglées de protect.OS (titres en français, couleurs du thème)
+    var jauges = ["processeur", "graphique", "memoire", "disque"];
+    var marge = 12;
+    var hauteur = Math.min(190, Math.floor((ecran.height - 110) / jauges.length) - marge);
+    var largeur = Math.round(hauteur * 1.2);
+    var x = ecran.width - largeur - 28;
+    var y = 24;
     for (var k = 0; k < jauges.length; k++) {
-        var jauge = bureau.addWidget("org.kde.plasma.systemmonitor", x, y + k * (hauteur + marge), largeur, hauteur);
-        jauge.currentConfigGroup = ["Appearance"];
-        jauge.writeConfig("title", jauges[k][0]);
-        jauge.writeConfig("showTitle", "true");
-        jauge.writeConfig("chartFace", "org.kde.ksysguard.piechart");
-        jauge.currentConfigGroup = ["Sensors"];
-        jauge.writeConfig("highPrioritySensorIds", '["' + jauges[k][1] + '"]');
-        jauge.writeConfig("totalSensors", '["' + jauges[k][1] + '"]');
-        jauge.writeConfig("lowPrioritySensorIds", jauges[k][2]);
-        jauge.writeConfig("sensorColors", '{"' + jauges[k][1] + '":"212,167,44"}');
+        bureau.addWidget("org.protectos.moniteur." + jauges[k], x, y + k * (hauteur + marge), largeur, hauteur);
     }
 }

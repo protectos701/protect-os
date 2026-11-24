@@ -1,0 +1,25 @@
+{
+    "KPackageStructure": "Plasma/Applet",
+    "KPlugin": {
+        "Authors": [
+            {
+                "Name": "protect.OS"
+            }
+        ],
+        "Category": "System Information",
+        "Description": "Espace utilisé sur les disques",
+        "EnabledByDefault": true,
+        "FormFactors": [
+            "desktop"
+        ],
+        "Icon": "drive-harddisk",
+        "Id": "org.protectos.moniteur.disque",
+        "License": "GPL-2.0+",
+        "Name": "Disque"
+    },
+    "X-Plasma-API-Minimum-Version": "6.0",
+    "X-Plasma-Provides": [
+        "org.kde.plasma.systemmonitor"
+    ],
+    "X-Plasma-RootPath": "org.kde.plasma.systemmonitor"
+}

@@ -1,0 +1,7 @@
+[Config]
+chartFace=org.kde.ksysguard.piechart
+highPrioritySensorIds=["cpu/all/usage"]
+totalSensors=["cpu/all/usage"]
+lowPrioritySensorIds=["cpu/all/averageFrequency", "cpu/all/averageTemperature"]
+
+[FaceConfig]

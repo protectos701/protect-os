@@ -1,0 +1,7 @@
+[Config]
+chartFace=org.kde.ksysguard.piechart
+highPrioritySensorIds=["gpu/all/usage"]
+totalSensors=["gpu/all/usage"]
+lowPrioritySensorIds=["gpu/all/usedVram", "gpu/all/totalVram"]
+
+[FaceConfig]

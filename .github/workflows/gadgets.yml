@@ -17,17 +17,19 @@ jobs:
           ls /usr/share/plasma/plasmoids | grep -i systemmonitor || true
           for f in $(find /usr/share/plasma/plasmoids/org.kde.plasma.systemmonitor.cpu /usr/share/plasma/plasmoids/org.kde.plasma.systemmonitor.memory -type f); do echo "--- $f"; cat "$f"; echo; done
           ls /usr/share/ksysguard/sensorfaces 2>/dev/null || find / -path /proc -prune -o -name '*piechart*' -print 2>/dev/null | head
+      - uses: actions/checkout@v4
       - name: Lancer la jauge
         shell: bash
         run: |
           Xvfb :99 -screen 0 1280x800x24 & sleep 2
-          export DISPLAY=:99 QT_QPA_PLATFORM=xcb
+          export DISPLAY=:99 QT_QPA_PLATFORM=xcb LANG=C.UTF-8 LANGUAGE=fr
           eval $(dbus-launch --sh-syntax)
           (ksystemstats > ksystemstats.log 2>&1 &) ; sleep 3
-          for p in org.kde.plasma.systemmonitor.cpu org.kde.plasma.systemmonitor; do
+          cp -r packages/protectos-theme/root/usr/share/plasma/plasmoids/org.protectos.* /usr/share/plasma/plasmoids/
+          for p in org.protectos.moniteur.processeur org.protectos.moniteur.graphique org.protectos.moniteur.memoire org.protectos.moniteur.disque; do
             echo "===== $p"
-            timeout 25 plasmawindowed $p > $p.log 2>&1 &
-            sleep 20
+            timeout 14 plasmawindowed $p > $p.log 2>&1 &
+            sleep 12
             xwd -root -silent | convert xwd:- $p.png
             grep -v "^$" $p.log | head -40
           done
@@ -35,8 +37,8 @@ jobs:
           python3 - <<'PY'
           import base64, io
           from PIL import Image
-          for p in ["org.kde.plasma.systemmonitor.cpu", "org.kde.plasma.systemmonitor"]:
-              b = io.BytesIO(); Image.open(p + ".png").convert("RGB").crop((0, 0, 640, 480)).save(b, "JPEG", quality=80)
+          for p in ["org.protectos.moniteur.processeur", "org.protectos.moniteur.graphique", "org.protectos.moniteur.memoire", "org.protectos.moniteur.disque"]:
+              b = io.BytesIO(); Image.open(p + ".png").convert("RGB").crop((0, 0, 320, 240)).save(b, "JPEG", quality=85)
               d = base64.b64encode(b.getvalue()).decode()
               print("APERCU-DEBUT " + p)
               for i in range(0, len(d), 900): print(d[i:i + 900])

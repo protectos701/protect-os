@@ -1,0 +1,25 @@
+{
+    "KPackageStructure": "Plasma/Applet",
+    "KPlugin": {
+        "Authors": [
+            {
+                "Name": "protect.OS"
+            }
+        ],
+        "Category": "System Information",
+        "Description": "Utilisation du processeur, fréquence et température",
+        "EnabledByDefault": true,
+        "FormFactors": [
+            "desktop"
+        ],
+        "Icon": "cpu",
+        "Id": "org.protectos.moniteur.processeur",
+        "License": "GPL-2.0+",
+        "Name": "Processeur"
+    },
+    "X-Plasma-API-Minimum-Version": "6.0",
+    "X-Plasma-Provides": [
+        "org.kde.plasma.systemmonitor"
+    ],
+    "X-Plasma-RootPath": "org.kde.plasma.systemmonitor"
+}

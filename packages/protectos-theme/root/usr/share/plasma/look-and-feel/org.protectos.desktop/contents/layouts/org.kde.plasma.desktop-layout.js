@@ -54,3 +54,31 @@ for (var j = 0; j < desktopsArray.length; j++) {
     desktopsArray[j].currentConfigGroup = ["Wallpaper", "org.kde.image", "General"];
     desktopsArray[j].writeConfig("Image", "file:///usr/share/wallpapers/ProtectOS/");
 }
+
+// Moniteur du système sur le bureau : processeur, carte graphique, mémoire, disque (jauges dorées en temps réel)
+var moniteur = true; // moniteur-bureau
+if (moniteur && desktopsArray.length > 0) {
+    var bureau = desktopsArray[0];
+    var ecran = screenGeometry(bureau.screen);
+    var jauges = [
+        ["Processeur", "cpu/all/usage", '["cpu/all/averageTemperature","cpu/all/averageFrequency"]'],
+        ["Carte graphique", "gpu/gpu0/usage", '["gpu/gpu0/temperature","gpu/gpu0/usedVram"]'],
+        ["Mémoire", "memory/physical/usedPercent", '["memory/physical/used","memory/physical/total"]'],
+        ["Disque", "disk/all/usedPercent", '["disk/all/free","disk/all/total"]']
+    ];
+    var largeur = 230, hauteur = 190, marge = 14;
+    var x = ecran.width - largeur - 36;
+    var y = Math.max(40, Math.floor((ecran.height - 60 - jauges.length * (hauteur + marge)) / 2));
+    for (var k = 0; k < jauges.length; k++) {
+        var jauge = bureau.addWidget("org.kde.plasma.systemmonitor", x, y + k * (hauteur + marge), largeur, hauteur);
+        jauge.currentConfigGroup = ["Appearance"];
+        jauge.writeConfig("title", jauges[k][0]);
+        jauge.writeConfig("showTitle", "true");
+        jauge.writeConfig("chartFace", "org.kde.ksysguard.piechart");
+        jauge.currentConfigGroup = ["Sensors"];
+        jauge.writeConfig("highPrioritySensorIds", '["' + jauges[k][1] + '"]');
+        jauge.writeConfig("totalSensors", '["' + jauges[k][1] + '"]');
+        jauge.writeConfig("lowPrioritySensorIds", jauges[k][2]);
+        jauge.writeConfig("sensorColors", '{"' + jauges[k][1] + '":"212,167,44"}');
+    }
+}

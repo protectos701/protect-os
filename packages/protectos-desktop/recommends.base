@@ -36,3 +36,4 @@ ufw
 plasma-firewall
 systemd-zram-generator
 power-profiles-daemon
+ksystemstats

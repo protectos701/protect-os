@@ -83,9 +83,9 @@ RACCOURCIS_ORIGINE = {
     "centre_protection": "Meta+Shift+P",
 }
 OPTIONS_ORIGINE = {"theme": "sombre", "barre": "centree", "position": "bas", "verre": "oui", "assistant": "oui",
-                   "bloqueur_pubs": "oui", "firefox_confidentiel": "oui"}
+                   "moniteur": "oui", "bloqueur_pubs": "oui", "firefox_confidentiel": "oui"}
 CHOIX = {"theme": ("sombre", "clair"), "barre": ("centree", "gauche"), "position": ("bas", "haut"),
-         "verre": ("oui", "non"), "assistant": ("oui", "non"), "bloqueur_pubs": ("oui", "non"),
+         "verre": ("oui", "non"), "assistant": ("oui", "non"), "moniteur": ("oui", "non"), "bloqueur_pubs": ("oui", "non"),
          "firefox_confidentiel": ("oui", "non")}
 THEME = os.path.join(ROOT, "packages", "protectos-theme", "root")
 
@@ -411,6 +411,8 @@ def appliquer_bureau(c):
                       "layouts", "org.kde.plasma.desktop-layout.js")
     spacer = 'panel.addWidget("org.kde.plasma.panelspacer"); // barre-centree'
     _remplacer(js, r"^(// )?" + re.escape(spacer), ("" if o["barre"] == "centree" else "// ") + spacer, re.M)
+    _remplacer(js, r"var moniteur = (true|false); // moniteur-bureau",
+               f"var moniteur = {'true' if o['moniteur'] == 'oui' else 'false'}; // moniteur-bureau")
     _remplacer(js, r'panel\.location = "(bottom|top)";', f'panel.location = "{"top" if o["position"] == "haut" else "bottom"}";')
     verre = o["verre"] == "oui"
     _remplacer(os.path.join(THEME, "etc", "xdg", "kwinrc"), r"translucencyEnabled=(true|false)",

@@ -1,0 +1,35 @@
+# Affiche chaque application protect.OS (Paramètres, Centre de protection…) dans un écran virtuel et la capture.
+name: Aperçu des applications
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "packages/protectos-bienvenue/**"
+      - "packages/protectos-protection/**"
+      - "packages/protectos-parental/**"
+      - "packages/protectos-programmes/**"
+      - "tools/apercu-applis.py"
+      - ".github/workflows/apercu-applis.yml"
+
+jobs:
+  apercu:
+    runs-on: ubuntu-latest
+    container: debian:trixie
+    steps:
+      - name: Outils
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends python3 python3-pyqt6 python3-pyqt6.qtsvg qt6-svg-plugins \
+            breeze-icon-theme fonts-noto-core fonts-dejavu-core libqt6svg6 locales
+      - uses: actions/checkout@v4
+      - name: Captures
+        env:
+          LANG: C.UTF-8
+        run: python3 tools/apercu-applis.py apercus
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: apercus-applications
+          path: apercus/

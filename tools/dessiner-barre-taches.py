@@ -24,10 +24,10 @@ ETATS = {
 }
 
 
-def cadre(prefixe, ox, oy, fond, op_fond, op_bord, trait, op_trait, ep):
+def cadre(prefixe, ox, oy, fond, op_fond, op_bord, trait, op_trait, ep, C=C, couleur_bord="#ffffff"):
     w, h = 2 * C + W, 2 * C + H
     remplissage = f'fill="{fond or "#000000"}" fill-opacity="{op_fond}"'
-    bord = f'stroke="#ffffff" stroke-opacity="{op_bord}" stroke-width="1"' if op_bord else 'stroke="none"'
+    bord = f'stroke="{couleur_bord}" stroke-opacity="{op_bord}" stroke-width="1"' if op_bord else 'stroke="none"'
     morceaux = {
         "topleft": (0, 0, C, C), "top": (C, 0, W, C), "topright": (C + W, 0, C, C),
         "left": (0, C, C, H), "center": (C, C, W, H), "right": (C + W, C, C, H),
@@ -53,18 +53,19 @@ def cadre(prefixe, ox, oy, fond, op_fond, op_bord, trait, op_trait, ep):
             dedans.append(f'<rect x="{X}" y="{Y}" width="{mw}" height="{mh}" {remplissage}/>')
             if op_bord and nom != "center":
                 if nom == "top":
-                    dedans.append(f'<rect x="{X}" y="{Y}" width="{mw}" height="1" fill="#ffffff" fill-opacity="{op_bord}"/>')
+                    dedans.append(f'<rect x="{X}" y="{Y}" width="{mw}" height="1" fill="{couleur_bord}" fill-opacity="{op_bord}"/>')
                 elif nom == "bottom":
-                    dedans.append(f'<rect x="{X}" y="{Y + mh - 1}" width="{mw}" height="1" fill="#ffffff" fill-opacity="{op_bord}"/>')
+                    dedans.append(f'<rect x="{X}" y="{Y + mh - 1}" width="{mw}" height="1" fill="{couleur_bord}" fill-opacity="{op_bord}"/>')
                 elif nom == "left":
-                    dedans.append(f'<rect x="{X}" y="{Y}" width="1" height="{mh}" fill="#ffffff" fill-opacity="{op_bord}"/>')
+                    dedans.append(f'<rect x="{X}" y="{Y}" width="1" height="{mh}" fill="{couleur_bord}" fill-opacity="{op_bord}"/>')
                 elif nom == "right":
-                    dedans.append(f'<rect x="{X + mw - 1}" y="{Y}" width="1" height="{mh}" fill="#ffffff" fill-opacity="{op_bord}"/>')
+                    dedans.append(f'<rect x="{X + mw - 1}" y="{Y}" width="1" height="{mh}" fill="{couleur_bord}" fill-opacity="{op_bord}"/>')
         if nom == "bottom" and trait:
             # trait doré : seulement sur la partie étirable du bas, donc plus court que le bouton
             dedans.append(f'<rect x="{X}" y="{Y + mh - ep - 1}" width="{mw}" height="{ep}" rx="{ep / 2}" '
                           f'fill="{trait}" fill-opacity="{op_trait}"/>')
-        out.append(f'<g id="{prefixe}-{nom}">{"".join(dedans)}</g>')
+        ident = f"{prefixe}-{nom}" if prefixe else nom
+        out.append(f'<g id="{ident}">{"".join(dedans)}</g>')
     return "\n".join(out), w, h
 
 
@@ -78,6 +79,10 @@ def main():
     with open(os.path.join(DEST, "widgets", "tasks.svg"), "w", encoding="utf-8") as f:
         f.write(f'<svg xmlns="http://www.w3.org/2000/svg" width="{x}" height="{2 * C + H}">\n'
                 + "\n".join(morceaux) + "\n</svg>\n")
+    # Fond des gadgets du bureau (jauges processeur, mémoire…) : verre bleu nuit, liseré doré, coins arrondis
+    svg, w, h = cadre("", 0, 0, "#0a1a52", 0.74, 0.55, None, 0, 0, C=14, couleur_bord=OR)
+    with open(os.path.join(DEST, "widgets", "background.svg"), "w", encoding="utf-8") as f:
+        f.write(f'<svg xmlns="http://www.w3.org/2000/svg" width="{w}" height="{h}">\n{svg}\n</svg>\n')
     meta = {"KPlugin": {"Authors": [{"Name": "protect.OS"}], "Id": "protectos", "License": "LGPL-2.1+",
                         "Name": "protect.OS", "Description": "Style de bureau de protect.OS",
                         "Version": "1.0", "Category": ""},

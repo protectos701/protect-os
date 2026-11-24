@@ -5,8 +5,7 @@ Maintainer: @MAINTAINER@
 Section: kde
 Priority: optional
 Depends: protectos-wallpapers (= @VERSION@), python3
-Recommends: pciutils
-Recommends: breeze, breeze-icon-theme, breeze-cursor-theme, sddm-theme-breeze
+Recommends: breeze, breeze-icon-theme, breeze-cursor-theme, sddm-theme-breeze, pciutils
 Description: Thème bleu et or de protect.OS pour KDE Plasma
  Couleurs bleu nuit et or, thème global « protect.OS Bleu et Or » avec barre
  des tâches centrée façon Windows, écran de chargement de session, effet de

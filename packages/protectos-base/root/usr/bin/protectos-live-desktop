@@ -10,6 +10,12 @@ for f in /usr/share/applications/install-protectos.desktop \
 done
 [ -n "$SRC" ] || exit 0
 
+# Session d'essai : l'écran ne se verrouille pas tout seul (personne ne connaît le mot de passe « live »)
+if command -v kwriteconfig6 >/dev/null 2>&1; then
+	kwriteconfig6 --file kscreenlockerrc --group Daemon --key Autolock false
+	kwriteconfig6 --file kscreenlockerrc --group Daemon --key LockOnResume false
+fi
+
 # Crée d'abord les dossiers en français (Bureau, Documents…), sinon un dossier « Desktop » apparaîtrait en double
 command -v xdg-user-dirs-update >/dev/null 2>&1 && xdg-user-dirs-update >/dev/null 2>&1
 DESK=$(xdg-user-dir DESKTOP 2>/dev/null)

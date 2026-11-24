@@ -223,7 +223,8 @@ class Bienvenue(QWidget):
                                    "ordinateur tant que vous n'installez pas protect.OS.<br><br>"
                                    "Conseil : pendant l'installation, cochez <b>« Chiffrer le système »</b> "
                                    "pour protéger vos fichiers en cas de vol, et sauvegardez d'abord vos "
-                                   "fichiers si vous remplacez Windows."), b))
+                                   "fichiers si vous remplacez Windows.<br><br>"
+                                   "Si un mot de passe vous est demandé pendant l'essai : <b>live</b>"), b))
         tips = [
             ("Menu Démarrer", "Le logo protect.OS en bas de l'écran ouvre le menu : tapez simplement le nom "
                               "d'une application pour la trouver."),

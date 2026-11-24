@@ -17,6 +17,8 @@ import sys
 NOM = "protect.OS"
 SRC = os.environ.get("PROTECTOS_APPS", "/usr/share/applications")
 LOCAL = os.environ.get("PROTECTOS_APPS_LOCAL", "/usr/local/share/applications")
+# Plasma 6 ne lit les raccourcis globaux (Windows+I…) que des applications déclarées dans ce dossier
+ACCEL = os.environ.get("PROTECTOS_ACCEL_LOCAL", "/usr/local/share/kglobalaccel")
 MARQUE = "X-ProtectOS-Identite=true"
 
 # Programmes techniques : ils restent installés (le système en a besoin) mais n'apparaissent nulle part.
@@ -279,8 +281,29 @@ def applications():
             lignes.insert(lignes.index("[Desktop Entry]") + 1, f"X-KDE-Shortcuts={cle}")
         with open(notre, "w", encoding="utf-8") as f:
             f.write("\n".join(lignes) + "\n")
+    declarer_raccourcis(touches)
     if os.path.exists("/usr/bin/update-desktop-database"):
         subprocess.run(["update-desktop-database", "-q", LOCAL], capture_output=True)
+
+
+def declarer_raccourcis(touches):
+    """Déclare à Plasma les applications qui ont un raccourci clavier choisi dans ma-personnalisation.conf."""
+    os.makedirs(ACCEL, exist_ok=True)
+    voulus = set()
+    for base in touches:
+        if os.path.exists(os.path.join(LOCAL, base)):
+            voulus.add(base)
+            lien = os.path.join(ACCEL, base)
+            cible = os.path.relpath(os.path.join(LOCAL, base), ACCEL)
+            if os.path.islink(lien) and os.readlink(lien) == cible:
+                continue
+            if os.path.lexists(lien):
+                os.remove(lien)
+            os.symlink(cible, lien)
+    for f in os.listdir(ACCEL):
+        lien = os.path.join(ACCEL, f)
+        if os.path.islink(lien) and f not in voulus and os.readlink(lien).startswith(".."):
+            os.remove(lien)
 
 
 def sessions():

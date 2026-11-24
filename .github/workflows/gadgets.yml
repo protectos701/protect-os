@@ -24,11 +24,13 @@ jobs:
           Xvfb :99 -screen 0 1280x800x24 & sleep 2
           export DISPLAY=:99 QT_QPA_PLATFORM=xcb LANG=C.UTF-8 LANGUAGE=fr
           eval $(dbus-launch --sh-syntax)
-          (ksystemstats > ksystemstats.log 2>&1 &) ; sleep 3
+          echo "Services D-Bus :"; ls /usr/share/dbus-1/services | grep -i -E "ksystemstats|ksysguard" || echo "(aucun)"
+          cat /usr/share/dbus-1/services/*ksystemstats* 2>/dev/null || true
+          ls /usr/lib/systemd/user | grep -i ksystemstats || true
+          touch ksystemstats.log   # le service n'est PAS démarré à la main : il doit l'être tout seul
           cp -r packages/protectos-theme/root/usr/share/plasma/plasmoids/org.protectos.* /usr/share/plasma/plasmoids/
-          for p in org.protectos.moniteur.processeur org.protectos.moniteur.memoire; do
+          for p in org.protectos.moniteur.processeur; do
             echo "===== $p"
-            if [ "$p" = org.protectos.moniteur.memoire ]; then export QT_QUICK_BACKEND=software; echo "(rendu logiciel)"; fi
             timeout 14 plasmawindowed $p > $p.log 2>&1 &
             sleep 12
             xwd -root -silent | convert xwd:- $p.png
@@ -38,7 +40,7 @@ jobs:
           python3 - <<'PY'
           import base64, io
           from PIL import Image
-          for p in ["org.protectos.moniteur.processeur", "org.protectos.moniteur.memoire"]:
+          for p in ["org.protectos.moniteur.processeur"]:
               b = io.BytesIO(); Image.open(p + ".png").convert("RGB").crop((0, 0, 320, 240)).save(b, "JPEG", quality=85)
               d = base64.b64encode(b.getvalue()).decode()
               print("APERCU-DEBUT " + p)

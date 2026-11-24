@@ -127,6 +127,69 @@ def analyse(png):
 
 
 # ------------------------------------------------------------------ test
+def touches(qmp, *noms, tenir=None):
+    """Appuie sur une combinaison de touches (noms QEMU : meta_l, alt, tab, esc, e…)."""
+    args = {"keys": [{"type": "qcode", "data": n} for n in noms]}
+    if tenir:
+        args["hold-time"] = tenir
+    qmp.cmd("send-key", **args)
+
+
+def clic(qmp, fx, fy, bouton="left"):
+    """Clique à une position de l'écran (fractions de la largeur et de la hauteur)."""
+    qmp.cmd("input-send-event", events=[
+        {"type": "abs", "data": {"axis": "x", "value": int(fx * 32767)}},
+        {"type": "abs", "data": {"axis": "y", "value": int(fy * 32767)}}])
+    time.sleep(0.3)
+    for bas in (True, False):
+        qmp.cmd("input-send-event", events=[{"type": "btn", "data": {"down": bas, "button": bouton}}])
+        time.sleep(0.1)
+
+
+def visite(qmp, sortie):
+    """Parcourt l'interface comme un utilisateur et capture chaque étape."""
+    etapes = []
+
+    def capture(nom, attente):
+        time.sleep(attente)
+        etapes.append((nom, qmp.screenshot(os.path.join(sortie, f"visite-{nom}.png"))))
+        log(f"Capture : visite-{nom}.png")
+
+    for nom, action, attente, apres in [
+        ("menu-demarrer", lambda: touches(qmp, "meta_l"), 3, lambda: touches(qmp, "esc")),
+        ("explorateur", lambda: touches(qmp, "meta_l", "e"), 7, None),
+        ("alt-tab", lambda: touches(qmp, "alt", "tab", tenir=4000), 1.5, None),
+        ("clic-droit-bureau", lambda: clic(qmp, 0.93, 0.30, "right"), 2.5, lambda: touches(qmp, "esc")),
+    ]:
+        try:
+            action()
+            capture(nom, attente)
+            if apres:
+                time.sleep(3 if nom == "alt-tab" else 0.5)
+                apres()
+            time.sleep(1.5 if nom != "alt-tab" else 3)
+        except Exception as e:  # la visite est un bonus : elle ne fait jamais échouer le test
+            log(f"Visite « {nom} » impossible : {e}")
+    return etapes
+
+
+def apercu(nom, png):
+    """Écrit une capture réduite dans le journal (lisible sans télécharger les artefacts)."""
+    try:
+        import base64
+        import io
+        from PIL import Image
+        b = io.BytesIO()
+        Image.open(png).convert("RGB").resize((960, 540)).save(b, "JPEG", quality=80)
+        d = base64.b64encode(b.getvalue()).decode()
+        print(f"APERCU-DEBUT {nom}")
+        for i in range(0, len(d), 900):
+            print(d[i:i + 900])
+        print("APERCU-FIN", flush=True)
+    except Exception as e:
+        print("Aperçu impossible :", e)
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("iso")
@@ -146,7 +209,7 @@ def main():
     cmd = [a.qemu, "-m", "4096", "-smp", "2",
            *(["-enable-kvm", "-cpu", "host"] if kvm else ["-cpu", "max"]),
            "-cdrom", a.iso, "-kernel", boot["kernel"], "-initrd", boot["initrd"], "-append", APPEND,
-           "-vga", "virtio", "-display", "none", "-serial", f"file:{serial}",
+           "-vga", "virtio", "-display", "none", "-usb", "-device", "usb-tablet", "-serial", f"file:{serial}",
            "-qmp", f"unix:{qmp_path},server=on,wait=off", "-no-reboot"]
     log(f"Démarrage de la machine virtuelle ({'KVM' if kvm else 'sans accélération, ce sera lent'})")
     vm = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
@@ -154,6 +217,7 @@ def main():
 
     start = time.time()
     shots, graphical_at, fatal = [], None, None
+    etapes = []
     plan = [20, 45, 90]          # captures pendant le démarrage
     deadline = start + a.limite
     while time.time() < deadline and vm.poll() is None:
@@ -185,6 +249,7 @@ def main():
     if vm.poll() is None:
         final = qmp.screenshot(os.path.join(a.sortie, "final.png"))
         shots.append(final)
+        etapes = visite(qmp, a.sortie) if graphical_at is not None else []
         try:
             qmp.cmd("quit")
         except Exception:
@@ -196,21 +261,12 @@ def main():
     shutil.rmtree(tmp, ignore_errors=True)
 
     last = analyse(shots[-1]) if shots and shots[-1].endswith(".png") else {}
-    # Aperçu de la dernière capture dans le journal (lisible sans télécharger les artefacts)
+    # Aperçus dans le journal : bureau, puis chaque étape de la visite
     if shots and shots[-1].endswith(".png") and os.path.exists(shots[-1]):
-        try:
-            import base64
-            import io
-            from PIL import Image
-            b = io.BytesIO()
-            Image.open(shots[-1]).convert("RGB").resize((960, 540)).save(b, "JPEG", quality=80)
-            d = base64.b64encode(b.getvalue()).decode()
-            print("APERCU-DEBUT")
-            for i in range(0, len(d), 900):
-                print(d[i:i + 900])
-            print("APERCU-FIN", flush=True)
-        except Exception as e:  # l'aperçu est un bonus : il ne doit jamais faire échouer le test
-            print("Aperçu impossible :", e)
+        apercu("bureau", shots[-1])
+    for nom, png in etapes:
+        if png and png.endswith(".png") and os.path.exists(png):
+            apercu(nom, png)
     ok = graphical_at is not None and fatal is None and last.get("noir", 0) < 0.9
     result = {
         "bureau_demarre": ok,

@@ -4,10 +4,14 @@ theme=Breeze
 ButtonsOnLeft=M
 ButtonsOnRight=IAX
 
+# Verre, et animations : la fenêtre réduite glisse vers la barre des tâches
 [Plugins]
 blurEnabled=true
 contrastEnabled=true
 translucencyEnabled=true
+magiclampEnabled=true
+squashEnabled=false
+scaleEnabled=true
 
 [Effect-blur]
 BlurStrength=12
@@ -22,3 +26,8 @@ ComboboxPopups=92
 DropdownMenus=92
 PopupMenus=92
 TornOffMenus=92
+
+# Alt+Tab façon Windows : grandes vignettes des fenêtres
+[TabBox]
+LayoutName=thumbnail_grid
+HighlightWindows=true

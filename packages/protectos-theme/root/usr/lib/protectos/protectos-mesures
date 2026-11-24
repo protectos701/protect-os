@@ -84,7 +84,10 @@ def graphique():
             ch = re.findall(r'"([^"]*)"', ligne)
             if len(ch) >= 3 and re.search(r"VGA|3D|Display", ch[0]):
                 nom = re.sub(r"^.*\[(.+)\].*$", r"\1", ch[2])
-                fab = ch[1].split()[0].replace("Advanced", "AMD")
+                fab = next((court for long, court in (("NVIDIA", "NVIDIA"), ("Intel", "Intel"),
+                                                      ("Advanced Micro", "AMD"), ("AMD", "AMD"), ("ATI", "AMD"),
+                                                      ("VMware", ""), ("Red Hat", ""), ("InnoTek", ""),
+                                                      ("Oracle", "")) if long in ch[1]), ch[1].split(",")[0])
                 nom = f"{fab} {nom}".strip()
                 break
     except Exception:

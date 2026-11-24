@@ -17,6 +17,10 @@ for f in /etc/xdg/autostart/calamares-desktop-icon.desktop /etc/xdg/autostart/in
 done
 grep -rl "install-debian" /etc/xdg/autostart 2>/dev/null | while read -r f; do rm -f "$f"; echo "  retiré : $f"; done
 
+echo "protect.OS : photo de profil (recherche d'avatars Debian)"
+ls -l /var/lib/AccountsService/icons 2>/dev/null || true
+find /etc/skel /usr/share/plasma/avatars /usr/share/pixmaps -maxdepth 2 \( -iname '*face*' -o -iname '*debian*' \) 2>/dev/null | head -20
+
 echo "protect.OS : nom du système"
 ls -l /etc/os-release /usr/lib/os-release || true
 if [ ! -L /etc/os-release ] || [ "$(readlink -f /etc/os-release)" != "/usr/lib/os-release" ]; then

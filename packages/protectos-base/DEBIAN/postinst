@@ -45,6 +45,7 @@ case "$1" in
 		identite_texte
 		/usr/lib/protectos/protectos-identite applications || true
 		/usr/lib/protectos/protectos-identite sessions || true
+		/usr/lib/protectos/protectos-identite traductions || true
 		;;
 esac
 exit 0

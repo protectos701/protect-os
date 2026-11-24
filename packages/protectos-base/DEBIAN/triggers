@@ -6,3 +6,5 @@ interest-noawait /usr/share/wayland-sessions
 interest-noawait /usr/share/xsessions
 # Réécrire le texte de connexion si une mise à jour le remet
 interest-noawait /etc/issue
+# Réappliquer les noms quand une mise à jour remplace les traductions
+interest-noawait /usr/share/locale

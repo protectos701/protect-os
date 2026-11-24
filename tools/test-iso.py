@@ -158,16 +158,16 @@ def visite(qmp, sortie):
     for nom, action, attente, apres in [
         ("menu-demarrer", lambda: touches(qmp, "meta_l"), 3, lambda: touches(qmp, "esc")),
         ("explorateur", lambda: touches(qmp, "meta_l", "e"), 7, None),
-        ("alt-tab", lambda: touches(qmp, "alt", "tab", tenir=4000), 1.5, None),
-        ("clic-droit-bureau", lambda: clic(qmp, 0.93, 0.30, "right"), 2.5, lambda: touches(qmp, "esc")),
+        ("alt-tab", lambda: touches(qmp, "alt", "tab", tenir=8000), 4, None),
+        ("clic-droit-bureau", lambda: clic(qmp, 0.93, 0.30, "right"), 4, lambda: touches(qmp, "esc")),
     ]:
         try:
             action()
             capture(nom, attente)
             if apres:
-                time.sleep(3 if nom == "alt-tab" else 0.5)
+                time.sleep(0.5)
                 apres()
-            time.sleep(1.5 if nom != "alt-tab" else 3)
+            time.sleep(6 if nom == "alt-tab" else 1.5)  # Alt+Tab : attendre que les touches soient relâchées
         except Exception as e:  # la visite est un bonus : elle ne fait jamais échouer le test
             log(f"Visite « {nom} » impossible : {e}")
     return etapes

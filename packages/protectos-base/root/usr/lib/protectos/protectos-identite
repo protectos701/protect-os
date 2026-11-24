@@ -232,6 +232,14 @@ def applications():
         if base not in faits and not os.path.exists(os.path.join(SRC, base)):
             if MARQUE in open(dst, encoding="utf-8", errors="replace").read():
                 os.remove(dst)
+    # Le panneau Paramètres de protect.OS remplace celui de KDE : il prend le nom choisi par l'utilisateur
+    notre = os.path.join(LOCAL, "systemsettings.desktop")
+    if os.path.exists(notre) and "X-ProtectOS-Parametres=true" in open(notre, encoding="utf-8").read():
+        nom = noms.get("systemsettings.desktop", "Paramètres")
+        lignes = [f"Name={nom}" if l.startswith("Name=") else l
+                  for l in open(notre, encoding="utf-8").read().splitlines() if not l.startswith("Name[")]
+        with open(notre, "w", encoding="utf-8") as f:
+            f.write("\n".join(lignes) + "\n")
     if os.path.exists("/usr/bin/update-desktop-database"):
         subprocess.run(["update-desktop-database", "-q", LOCAL], capture_output=True)
 

@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Paramètres
+Comment=Wi-Fi, affichage, son, comptes, fond d'écran et tous les réglages
+Exec=protectos-parametres
+Icon=preferences-system
+Terminal=false
+Categories=Qt;Settings;System;
+Keywords=paramètres;réglages;configuration;wifi;son;écran;affichage;compte;fond;thème;
+StartupWMClass=systemsettings
+X-ProtectOS-Parametres=true

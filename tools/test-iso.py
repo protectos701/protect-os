@@ -159,7 +159,7 @@ def visite(qmp, sortie):
         ("menu-demarrer", lambda: touches(qmp, "meta_l"), 3, lambda: touches(qmp, "esc")),
         ("explorateur", lambda: touches(qmp, "meta_l", "e"), 7, None),
         ("alt-tab", lambda: touches(qmp, "alt", "tab", tenir=14000), 9, None),
-        ("clic-droit-bureau", lambda: clic(qmp, 0.93, 0.30, "right"), 5, lambda: touches(qmp, "esc")),
+        ("parametres", lambda: touches(qmp, "meta_l", "i"), 9, None),
     ]:
         try:
             action()

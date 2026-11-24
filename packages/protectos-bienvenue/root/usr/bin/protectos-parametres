@@ -1,0 +1,302 @@
+#!/usr/bin/python3
+"""Paramètres de protect.OS : de grandes tuiles claires, une recherche, et chaque réglage dans sa propre fenêtre.
+
+  protectos-parametres               ouvre le panneau
+  protectos-parametres --liste       affiche les tuiles disponibles (texte)
+"""
+import glob
+import os
+import shutil
+import subprocess
+import sys
+import unicodedata
+
+OR = "#d4a72c"
+
+# (catégorie, titre, description, icône, action, mots-clés)
+# action : "kcm:<module>" (réglage KDE seul dans sa fenêtre), "cmd:<commande>", ou une page interne
+TUILES = [
+    ("Système", "Affichage", "Résolution, écrans, mise à l'échelle", "video-display", "kcm:kcm_kscreen",
+     "écran moniteur résolution taille zoom luminosité"),
+    ("Système", "Son", "Haut-parleurs, micro, volume", "audio-volume-high", "kcm:kcm_pulseaudio",
+     "audio volume micro casque haut-parleur"),
+    ("Système", "Notifications", "Messages et alertes", "preferences-desktop-notification", "kcm:kcm_notifications",
+     "notification alerte ne pas déranger"),
+    ("Système", "Énergie", "Batterie, veille, mise en veille de l'écran", "preferences-system-power-management",
+     "kcm:kcm_powerdevilprofilesconfig", "batterie veille alimentation économie"),
+    ("Système", "Stockage", "Disques et espace libre", "drive-harddisk", "cmd:partitionmanager",
+     "disque espace partition stockage"),
+    ("Réseau", "Wi-Fi et Internet", "Connexions sans fil et câblées", "network-wireless", "kcm:kcm_networkmanagement",
+     "wifi internet réseau connexion ethernet vpn"),
+    ("Réseau", "Bluetooth", "Casques, souris, téléphones", "preferences-system-bluetooth", "kcm:kcm_bluetooth",
+     "bluetooth appareil casque"),
+    ("Personnalisation", "Fond d'écran", "Choisir l'image du bureau", "preferences-desktop-wallpaper", "fond",
+     "fond écran image bureau wallpaper"),
+    ("Personnalisation", "Thème", "Sombre ou clair", "preferences-desktop-theme", "theme",
+     "thème sombre clair couleur apparence"),
+    ("Personnalisation", "Polices", "Taille et style du texte", "preferences-desktop-font", "kcm:kcm_fonts",
+     "police texte taille écriture"),
+    ("Comptes", "Comptes", "Utilisateurs, mots de passe, photo", "system-users", "kcm:kcm_users",
+     "compte utilisateur mot de passe photo"),
+    ("Comptes", "Contrôle parental", "Temps d'écran et sites pour les enfants", "protectos-logo", "cmd:protectos-parental",
+     "enfant parental temps écran filtre"),
+    ("Protection", "Mises à jour", "Garder protect.OS à jour", "system-software-update", "cmd:plasma-discover --mode update",
+     "mise à jour update sécurité"),
+    ("Protection", "Centre de protection", "Antivirus, pare-feu, vie privée", "protectos-logo", "cmd:protectos-protection",
+     "antivirus pare-feu sécurité protection vie privée"),
+    ("Protection", "Verrouillage de l'écran", "Mot de passe au réveil", "system-lock-screen", "kcm:kcm_screenlocker",
+     "verrouillage écran mot de passe"),
+    ("Appareils", "Imprimantes", "Ajouter et gérer les imprimantes", "printer", "kcm:kcm_printer_manager",
+     "imprimante scanner impression"),
+    ("Appareils", "Souris et pavé tactile", "Vitesse, clic, défilement", "input-mouse", "kcm:kcm_mouse",
+     "souris touchpad pavé tactile clic"),
+    ("Appareils", "Clavier", "Disposition et raccourcis", "input-keyboard", "kcm:kcm_keyboard",
+     "clavier azerty disposition touches"),
+    ("Heure et langue", "Date et heure", "Fuseau horaire, horloge", "preferences-system-time", "kcm:kcm_clock",
+     "date heure horloge fuseau"),
+    ("Heure et langue", "Langue et région", "Langue, formats, monnaie", "preferences-desktop-locale",
+     "kcm:kcm_regionandlang", "langue région format français"),
+    ("Applications", "Applications par défaut", "Navigateur, courriel, lecteur…", "preferences-desktop-default-applications",
+     "kcm:kcm_componentchooser", "défaut navigateur courriel ouvrir avec"),
+    ("Applications", "Programmes et fonctionnalités", "Programmes Windows et désinstallation", "protectos-logo",
+     "cmd:protectos-programmes", "programme windows exe désinstaller"),
+    ("Applications", "Démarrage automatique", "Ce qui se lance à l'ouverture de session", "system-run",
+     "kcm:kcm_autostart", "démarrage automatique lancement"),
+    ("Accessibilité", "Accessibilité", "Loupe, contraste, lecture d'écran", "preferences-desktop-accessibility",
+     "kcm:kcm_access", "accessibilité loupe contraste malvoyant"),
+    ("Accessibilité", "À propos de protect.OS", "Version et caractéristiques du PC", "protectos-logo",
+     "cmd:protectos-a-propos", "à propos version système ordinateur"),
+    ("Accessibilité", "Paramètres avancés", "Tous les réglages détaillés", "preferences-system", "cmd:systemsettings",
+     "avancé tous expert"),
+]
+
+
+def simple(t):
+    return "".join(c for c in unicodedata.normalize("NFKD", t.lower()) if not unicodedata.combining(c))
+
+
+def ouvrir(action):
+    """Lance un réglage : module KDE seul dans sa fenêtre, ou programme."""
+    if action.startswith("kcm:"):
+        module = action[4:]
+        for outil in ("kcmshell6", "kcmshell5"):
+            if shutil.which(outil):
+                subprocess.Popen([outil, module])
+                return True
+        subprocess.Popen(["systemsettings", module])
+        return True
+    if action.startswith("cmd:"):
+        args = action[4:].split()
+        if shutil.which(args[0]):
+            subprocess.Popen(args)
+            return True
+    return False
+
+
+def fonds():
+    """Fonds d'écran protect.OS : (nom, aperçu, image)."""
+    out = []
+    for d in sorted(glob.glob("/usr/share/wallpapers/ProtectOS*")):
+        nom = os.path.basename(d).replace("ProtectOS-", "").replace("ProtectOS", "Vitrail")
+        try:
+            import json
+            nom = json.load(open(os.path.join(d, "metadata.json")))["KPlugin"]["Name"].replace("protect.OS ", "")
+        except Exception:
+            pass
+        imgs = sorted(glob.glob(os.path.join(d, "contents", "images", "1920x1080.*")))
+        if imgs:
+            apercu = (glob.glob(os.path.join(d, "contents", "screenshot.*")) or imgs)[0]
+            out.append((nom, apercu, imgs[0]))
+    return out
+
+
+def appliquer_theme(clair):
+    subprocess.run(["plasma-apply-colorscheme", "ProtectBleuOr" + ("Clair" if clair else "")], capture_output=True)
+    for outil in glob.glob("/usr/lib/*/libexec/plasma-changeicons") + glob.glob("/usr/libexec/plasma-changeicons"):
+        subprocess.run([outil, "ProtectOS" + ("-Clair" if clair else "")], capture_output=True)
+        break
+
+
+if "--liste" in sys.argv:
+    for cat, titre, desc, _i, action, _m in TUILES:
+        print(f"{cat:16} {titre:30} {action}")
+    sys.exit(0)
+
+from PyQt6.QtCore import QSize, Qt  # noqa: E402
+from PyQt6.QtGui import QFont, QIcon, QPixmap  # noqa: E402
+from PyQt6.QtWidgets import (QApplication, QDialog, QFrame, QGridLayout, QHBoxLayout, QLabel,  # noqa: E402
+                             QLineEdit, QPushButton, QScrollArea, QSizePolicy, QToolButton, QVBoxLayout,
+                             QWidget)
+
+STYLE = f"""
+#banniere {{ background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #16307a, stop:1 #060f2e);
+            border-bottom: 2px solid {OR}; }}
+#banniere QLabel {{ color: #eef2fb; }}
+#recherche {{ border: 1px solid rgba(212,167,44,0.55); border-radius: 18px; padding: 7px 16px;
+             background: rgba(0,0,0,0.25); color: #eef2fb; }}
+QLabel#categorie {{ color: {OR}; font-weight: bold; }}
+QToolButton#tuile {{ border: 1px solid rgba(212,167,44,0.28); border-radius: 12px; padding: 10px;
+                    background: rgba(255,255,255,0.04); text-align: left; }}
+QToolButton#tuile:hover {{ border-color: {OR}; background: rgba(212,167,44,0.12); }}
+QToolButton#carte {{ border: 2px solid transparent; border-radius: 12px; padding: 6px; }}
+QToolButton#carte:hover {{ border-color: {OR}; }}
+"""
+
+
+class Fonds(QDialog):
+    def __init__(self, parent):
+        super().__init__(parent)
+        self.setWindowTitle("Fond d'écran")
+        self.setStyleSheet(STYLE)
+        lay = QVBoxLayout(self)
+        lay.addWidget(QLabel("<b>Choisissez votre fond d'écran</b> — il s'applique tout de suite."))
+        g = QGridLayout()
+        g.setSpacing(12)
+        for i, (nom, apercu, image) in enumerate(fonds()):
+            b = QToolButton()
+            b.setObjectName("carte")
+            b.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextUnderIcon)
+            b.setIcon(QIcon(QPixmap(apercu)))
+            b.setIconSize(QSize(240, 135))
+            b.setText(nom)
+            b.clicked.connect(lambda _c=False, img=image: self.choisir(img))
+            g.addWidget(b, i // 3, i % 3)
+        lay.addLayout(g)
+        self.message = QLabel("")
+        lay.addWidget(self.message)
+
+    def choisir(self, image):
+        r = subprocess.run(["plasma-apply-wallpaperimage", image], capture_output=True)
+        self.message.setText("Fond d'écran appliqué." if r.returncode == 0 else "Impossible d'appliquer ce fond.")
+
+
+class Theme(QDialog):
+    def __init__(self, parent):
+        super().__init__(parent)
+        self.setWindowTitle("Thème")
+        self.setStyleSheet(STYLE)
+        lay = QVBoxLayout(self)
+        lay.addWidget(QLabel("<b>Sombre ou clair ?</b> Le changement est immédiat, vous pouvez revenir à tout moment."))
+        row = QHBoxLayout()
+        for titre, clair, fond, texte in (("Sombre", False, "#0a1a52", "#f3d27a"), ("Clair", True, "#e2e9f8", "#7a5a08")):
+            b = QPushButton(titre)
+            b.setMinimumSize(200, 120)
+            b.setStyleSheet(f"background:{fond}; color:{texte}; border:2px solid {OR}; border-radius:12px;"
+                            "font-size:18px; font-weight:bold;")
+            b.clicked.connect(lambda _c=False, c=clair: (appliquer_theme(c), self.message.setText("Thème appliqué.")))
+            row.addWidget(b)
+        lay.addLayout(row)
+        self.message = QLabel("")
+        lay.addWidget(self.message)
+
+
+class Parametres(QWidget):
+    def __init__(self):
+        super().__init__()
+        self.setWindowTitle("Paramètres")
+        self.setWindowIcon(QIcon.fromTheme("preferences-system"))
+        self.setStyleSheet(STYLE)
+        self.resize(980, 720)
+        self.tuiles = []
+
+        banniere = QWidget()
+        banniere.setObjectName("banniere")
+        bl = QVBoxLayout(banniere)
+        bl.setContentsMargins(28, 20, 28, 18)
+        titre = QLabel("Paramètres")
+        f = QFont(titre.font())
+        f.setPointSizeF(f.pointSizeF() * 1.9)
+        f.setBold(True)
+        titre.setFont(f)
+        self.recherche = QLineEdit()
+        self.recherche.setObjectName("recherche")
+        self.recherche.setPlaceholderText("Rechercher un paramètre (Wi-Fi, son, fond d'écran…)")
+        self.recherche.setClearButtonEnabled(True)
+        self.recherche.textChanged.connect(self.filtrer)
+        self.recherche.returnPressed.connect(self.premier)
+        bl.addWidget(titre)
+        bl.addWidget(self.recherche)
+
+        hote = QWidget()
+        self.grille = QVBoxLayout(hote)
+        self.grille.setContentsMargins(28, 18, 28, 24)
+        self.grille.setSpacing(8)
+        self.sections = {}
+        for cat, nom, desc, icone, action, mots in TUILES:
+            if cat not in self.sections:
+                lab = QLabel(cat)
+                lab.setObjectName("categorie")
+                g = QGridLayout()
+                g.setSpacing(10)
+                self.grille.addWidget(lab)
+                self.grille.addLayout(g)
+                self.sections[cat] = (lab, g, [])
+            lab, g, membres = self.sections[cat]
+            b = QToolButton()
+            b.setObjectName("tuile")
+            b.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
+            b.setIcon(QIcon.fromTheme(icone, QIcon.fromTheme("preferences-system")))
+            b.setIconSize(QSize(36, 36))
+            b.setText(f"{nom}\n{desc}")
+            b.setMinimumSize(280, 64)
+            b.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+            b.clicked.connect(lambda _c=False, a=action: self.lancer(a))
+            membres.append(b)
+            self.tuiles.append((b, cat, simple(f"{nom} {desc} {mots}")))
+        self.grille.addStretch(1)
+        self.ranger()
+
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.Shape.NoFrame)
+        scroll.setWidget(hote)
+        lay = QVBoxLayout(self)
+        lay.setContentsMargins(0, 0, 0, 0)
+        lay.addWidget(banniere)
+        lay.addWidget(scroll, 1)
+        self.recherche.setFocus()
+
+    def ranger(self, visibles=None):
+        for cat, (lab, g, membres) in self.sections.items():
+            for b in membres:
+                g.removeWidget(b)
+            montres = [b for b in membres if visibles is None or b in visibles]
+            for i, b in enumerate(montres):
+                g.addWidget(b, i // 3, i % 3)
+            for b in membres:
+                b.setVisible(b in montres)
+            lab.setVisible(bool(montres))
+
+    def filtrer(self, texte):
+        mots = simple(texte).split()
+        if not mots:
+            self.ranger()
+            return
+        self.ranger({b for b, _c, cle in self.tuiles if all(m in cle for m in mots)})
+
+    def premier(self):
+        for b, _c, _k in self.tuiles:
+            if b.isVisible():
+                b.click()
+                return
+
+    def lancer(self, action):
+        if action == "fond":
+            Fonds(self).exec()
+        elif action == "theme":
+            Theme(self).exec()
+        else:
+            ouvrir(action)
+
+
+def main():
+    app = QApplication(sys.argv)
+    app.setApplicationName("Paramètres")
+    app.setDesktopFileName("systemsettings")
+    w = Parametres()
+    w.show()
+    return app.exec()
+
+
+if __name__ == "__main__":
+    sys.exit(main())

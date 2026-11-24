@@ -396,7 +396,7 @@ class Bienvenue(QWidget):
         grid = QGridLayout()
         links = [
             ("Centre de protection", "protectos-logo", "protectos-protection"),
-            ("Paramètres du système", "configure", "systemsettings"),
+            ("Paramètres", "preferences-system", "protectos-parametres"),
             ("Magasin d'applications", "plasmadiscover", "plasma-discover"),
             ("Programmes et fonctionnalités", "protectos-logo", "protectos-programmes"),
             ("Explorateur de fichiers", "system-file-manager", "dolphin"),

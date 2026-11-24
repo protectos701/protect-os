@@ -8,3 +8,5 @@ interest-noawait /usr/share/xsessions
 interest-noawait /etc/issue
 # Réappliquer les noms quand une mise à jour remplace les traductions
 interest-noawait /usr/share/locale
+# Réappliquer les raccourcis clavier choisis quand ils changent
+interest-noawait /etc/xdg/kglobalshortcutsrc

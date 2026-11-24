@@ -172,8 +172,30 @@ def lire_noms_choisis():
     return noms
 
 
-def reecrire(src, nom=None, cacher=False):
-    """Copie le raccourci dans /usr/local (prioritaire) avec un nom neutre ou caché."""
+def raccourcis_clavier():
+    """Raccourcis choisis dans ma-personnalisation.conf : {raccourci.desktop: {"_launch": "Meta+E", action: …}}.
+    Plasma 6 les lit dans les raccourcis d'applications (X-KDE-Shortcuts) : on les y recopie."""
+    out, section = {}, None
+    try:
+        for ligne in open(os.environ.get("PROTECTOS_RACCOURCIS", "/etc/xdg/kglobalshortcutsrc"), encoding="utf-8"):
+            ligne = ligne.rstrip("\n")
+            m = re.match(r"^\[services\]\[(.+)\]$", ligne)
+            if m:
+                section = m.group(1)
+                continue
+            if ligne.startswith("["):
+                section = None
+            elif section and "=" in ligne and not ligne.startswith("#"):
+                k, v = ligne.split("=", 1)
+                out.setdefault(section, {})[k.strip()] = ",".join(x for x in v.split("\t") if x and x != "none")
+    except OSError:
+        pass
+    return out
+
+
+def reecrire(src, nom=None, cacher=False, touches=None):
+    """Copie le raccourci dans /usr/local (prioritaire) avec un nom neutre, caché, ou avec ses raccourcis clavier."""
+    touches = touches or {}
     out, section = [], None
     for ligne in open(src, encoding="utf-8", errors="replace").read().splitlines():
         if ligne.startswith("["):
@@ -184,8 +206,19 @@ def reecrire(src, nom=None, cacher=False):
                     out.append(f"Name={nom}")
                 if cacher:
                     out.append("NoDisplay=true")
+                if touches.get("_launch"):
+                    out.append(f"X-KDE-Shortcuts={touches['_launch']}")
                 out.append(MARQUE)
+            elif ligne.startswith("[Desktop Action "):
+                action = ligne[len("[Desktop Action "):-1]
+                if touches.get(action):
+                    out.append(f"X-KDE-Shortcuts={touches[action]}")
             continue
+        if ligne.startswith("X-KDE-Shortcuts="):
+            if section == "[Desktop Entry]" and touches.get("_launch"):
+                continue
+            if section and section.startswith("[Desktop Action ") and touches.get(section[len("[Desktop Action "):-1]):
+                continue
         if section == "[Desktop Entry]":
             cle = ligne.split("=", 1)[0].split("[", 1)[0]
             if nom and cle in ("Name", "X-GNOME-FullName"):
@@ -211,18 +244,20 @@ def reecrire(src, nom=None, cacher=False):
 
 def applications():
     noms = {**NOMS, **lire_noms_choisis()}
+    touches = raccourcis_clavier()
     faits = set()
     for src in sorted(glob.glob(os.path.join(SRC, "*.desktop"))):
         base = os.path.basename(src)
         dst = os.path.join(LOCAL, base)
         if os.path.exists(dst) and MARQUE not in open(dst, encoding="utf-8", errors="replace").read():
             continue  # raccourci personnalisé par l'administrateur : on n'y touche pas
+        t = touches.get(base)
         if base in CACHER:
-            reecrire(src, cacher=True)
+            reecrire(src, cacher=True, touches=t)
         elif base in noms:
-            reecrire(src, nom=noms[base])
-        elif MOTS.search(open(src, encoding="utf-8", errors="replace").read()):
-            reecrire(src)
+            reecrire(src, nom=noms[base], touches=t)
+        elif t or MOTS.search(open(src, encoding="utf-8", errors="replace").read()):
+            reecrire(src, touches=t)
         else:
             continue
         faits.add(base)
@@ -237,7 +272,11 @@ def applications():
     if os.path.exists(notre) and "X-ProtectOS-Parametres=true" in open(notre, encoding="utf-8").read():
         nom = noms.get("systemsettings.desktop", "Paramètres")
         lignes = [f"Name={nom}" if l.startswith("Name=") else l
-                  for l in open(notre, encoding="utf-8").read().splitlines() if not l.startswith("Name[")]
+                  for l in open(notre, encoding="utf-8").read().splitlines()
+                  if not l.startswith(("Name[", "X-KDE-Shortcuts="))]
+        cle = (touches.get("systemsettings.desktop") or {}).get("_launch")
+        if cle:
+            lignes.insert(lignes.index("[Desktop Entry]") + 1, f"X-KDE-Shortcuts={cle}")
         with open(notre, "w", encoding="utf-8") as f:
             f.write("\n".join(lignes) + "\n")
     if os.path.exists("/usr/bin/update-desktop-database"):

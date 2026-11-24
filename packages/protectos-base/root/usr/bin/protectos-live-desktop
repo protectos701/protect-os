@@ -10,7 +10,10 @@ for f in /usr/share/applications/install-protectos.desktop \
 done
 [ -n "$SRC" ] || exit 0
 
-DESK=$(xdg-user-dir DESKTOP 2>/dev/null || echo "$HOME/Desktop")
+# Crée d'abord les dossiers en français (Bureau, Documents…), sinon un dossier « Desktop » apparaîtrait en double
+command -v xdg-user-dirs-update >/dev/null 2>&1 && xdg-user-dirs-update >/dev/null 2>&1
+DESK=$(xdg-user-dir DESKTOP 2>/dev/null)
+[ -n "$DESK" ] && [ "$DESK" != "$HOME" ] || DESK="$HOME/Bureau"
 mkdir -p "$DESK"
 DEST="$DESK/installer-protect-os.desktop"
 [ -f "$DEST" ] && exit 0

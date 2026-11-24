@@ -333,6 +333,25 @@ def nom_systeme():
         pass
 
 
+def avatar():
+    """Photo de profil des nouveaux comptes : le bouclier protect.OS (desktop-base fournit le logo Debian).
+    Lancé à la fin de la construction et au démarrage, jamais pendant une installation de paquets."""
+    src = "/usr/share/protectos/avatar.png"
+    if not os.path.exists(src):
+        return
+    try:
+        if os.path.exists("/etc/skel/.face") and open("/etc/skel/.face", "rb").read() == open(src, "rb").read():
+            return
+        os.makedirs("/etc/skel", exist_ok=True)
+        import shutil
+        shutil.copyfile(src, "/etc/skel/.face")
+        if os.path.lexists("/etc/skel/.face.icon"):
+            os.remove("/etc/skel/.face.icon")
+        os.symlink(".face", "/etc/skel/.face.icon")
+    except OSError:
+        pass
+
+
 def main():
     cmd = sys.argv[1] if len(sys.argv) > 1 else "tout"
     if cmd == "tout":
@@ -347,6 +366,8 @@ def main():
         grub()
     if cmd == "uefi":
         uefi()
+    if cmd == "avatar":
+        avatar()
     return 0
 
 

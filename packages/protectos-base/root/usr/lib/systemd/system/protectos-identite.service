@@ -7,6 +7,7 @@ ConditionPathExists=!/run/live/medium
 Type=oneshot
 ExecStart=/usr/lib/protectos/protectos-identite tout
 ExecStart=/usr/lib/protectos/protectos-identite uefi
+ExecStart=/usr/lib/protectos/protectos-identite avatar
 
 [Install]
 WantedBy=multi-user.target

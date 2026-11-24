@@ -62,5 +62,7 @@ done
 
 echo "protect.OS : identité appliquée à tous les logiciels installés"
 /usr/lib/protectos/protectos-identite tout || true
+/usr/lib/protectos/protectos-identite avatar || true
+ls -l /etc/skel/.face /etc/skel/.face.icon || true
 
 echo "protect.OS : réglages de l'image d'essai terminés"

@@ -375,6 +375,30 @@ def _remplacer(path, motif, remplacement, flags=0):
             f.write(n)
 
 
+DEBUT_COULEURS = "# --- Couleurs protect.OS (copiées du jeu de couleurs par tools/personnaliser.py) ---"
+FIN_COULEURS = "# --- Fin des couleurs protect.OS ---"
+
+
+def copier_couleurs(clair):
+    """Recopie les couleurs du jeu choisi dans kdeglobals : le gestionnaire de fenêtres (barres de titre)
+    lit ce fichier directement, avant même que le compte ait appliqué un jeu de couleurs."""
+    jeu = os.path.join(THEME, "usr", "share", "color-schemes", "ProtectBleuOr" + ("Clair" if clair else "") + ".colors")
+    kg = os.path.join(THEME, "etc", "xdg", "kdeglobals")
+    blocs, garder = [], False
+    for ligne in open(jeu, encoding="utf-8").read().splitlines():
+        if ligne.startswith("["):
+            garder = ligne.startswith("[Colors:") or ligne == "[WM]"
+        if garder:
+            blocs.append(ligne)
+    texte = "\n".join(blocs).strip() + "\n"
+    s = open(kg, encoding="utf-8").read()
+    if DEBUT_COULEURS in s:
+        s = s[:s.index(DEBUT_COULEURS)].rstrip("\n") + "\n"
+    s = s.rstrip("\n") + "\n\n" + DEBUT_COULEURS + "\n" + texte + FIN_COULEURS + "\n"
+    with open(kg, "w", encoding="utf-8") as f:
+        f.write(s)
+
+
 def appliquer_bureau(c):
     o = c["options"]
     clair = o["theme"] == "clair"
@@ -382,6 +406,7 @@ def appliquer_bureau(c):
               os.path.join(THEME, "usr", "share", "plasma", "look-and-feel", "org.protectos.desktop", "contents", "defaults")):
         _remplacer(p, r"ColorScheme=ProtectBleuOr(Clair)?\b", "ColorScheme=ProtectBleuOr" + ("Clair" if clair else ""))
         _remplacer(p, r"(\[Icons\]\nTheme=)ProtectOS(-Clair)?\b", r"\g<1>ProtectOS" + ("-Clair" if clair else ""))
+    copier_couleurs(clair)
     js = os.path.join(THEME, "usr", "share", "plasma", "look-and-feel", "org.protectos.desktop", "contents",
                       "layouts", "org.kde.plasma.desktop-layout.js")
     spacer = 'panel.addWidget("org.kde.plasma.panelspacer"); // barre-centree'

@@ -1,0 +1,125 @@
+#!/usr/bin/python3
+"""Mesures pour le gadget « Moniteur » du bureau : affiche une ligne JSON.
+
+{"cpu": 12.5, "cpuTxt": "3,4 GHz · 48 °C", "gpu": 7, "gpuTxt": "AMD Radeon", "mem": 41.0, "memTxt": "3,2 / 7,8 Go",
+ "disque": 37.0, "disqueTxt": "120 Go libres"}   (gpu = -1 si l'utilisation n'est pas mesurable)
+"""
+import glob
+import json
+import os
+import re
+import shutil
+import subprocess
+import time
+
+
+def lire(chemin):
+    try:
+        return open(chemin, encoding="utf-8", errors="replace").read().strip()
+    except OSError:
+        return ""
+
+
+def nombre(x):
+    return f"{x:.1f}".replace(".", ",")
+
+
+def processeur():
+    def instant():
+        champs = [int(v) for v in lire("/proc/stat").splitlines()[0].split()[1:]]
+        return sum(champs), champs[3] + (champs[4] if len(champs) > 4 else 0)
+    t1, i1 = instant()
+    time.sleep(0.3)
+    t2, i2 = instant()
+    usage = 100.0 * (1 - (i2 - i1) / max(1, t2 - t1))
+    freqs = [int(lire(f)) for f in glob.glob("/sys/devices/system/cpu/cpu*/cpufreq/scaling_cur_freq") if lire(f).isdigit()]
+    morceaux = []
+    if freqs:
+        morceaux.append(f"{nombre(sum(freqs) / len(freqs) / 1e6)} GHz")
+    temp = temperature_cpu()
+    if temp:
+        morceaux.append(f"{temp:.0f} °C")
+    return max(0.0, min(100.0, usage)), " · ".join(morceaux) or f"{os.cpu_count()} cœurs"
+
+
+def temperature_cpu():
+    for hw in glob.glob("/sys/class/hwmon/hwmon*"):
+        if lire(os.path.join(hw, "name")) in ("coretemp", "k10temp", "zenpower", "cpu_thermal"):
+            v = lire(os.path.join(hw, "temp1_input"))
+            if v.lstrip("-").isdigit():
+                return int(v) / 1000
+    for z in glob.glob("/sys/class/thermal/thermal_zone*"):
+        if "x86_pkg" in lire(os.path.join(z, "type")) or "cpu" in lire(os.path.join(z, "type")).lower():
+            v = lire(os.path.join(z, "temp"))
+            if v.isdigit():
+                return int(v) / 1000
+    return None
+
+
+def graphique():
+    # NVIDIA
+    if shutil.which("nvidia-smi"):
+        try:
+            r = subprocess.run(["nvidia-smi", "--query-gpu=utilization.gpu,temperature.gpu,name",
+                                "--format=csv,noheader,nounits"], capture_output=True, text=True, timeout=2)
+            u, t, nom = [x.strip() for x in r.stdout.splitlines()[0].split(",", 2)]
+            return float(u), f"{nom.replace('NVIDIA ', '')} · {t} °C"
+        except Exception:
+            pass
+    # AMD (et quelques autres pilotes) : pourcentage d'occupation exposé par le noyau
+    for f in sorted(glob.glob("/sys/class/drm/card*/device/gpu_busy_percent")):
+        v = lire(f)
+        if v.isdigit():
+            dev = os.path.dirname(f)
+            temp = ""
+            for t in glob.glob(os.path.join(dev, "hwmon", "hwmon*", "temp1_input")):
+                if lire(t).isdigit():
+                    temp = f" · {int(lire(t)) / 1000:.0f} °C"
+            return float(v), "Radeon" + temp
+    # Sinon : seulement le nom de la carte
+    nom = ""
+    try:
+        r = subprocess.run(["lspci", "-mm"], capture_output=True, text=True, timeout=2)
+        for ligne in r.stdout.splitlines():
+            ch = re.findall(r'"([^"]*)"', ligne)
+            if len(ch) >= 3 and re.search(r"VGA|3D|Display", ch[0]):
+                nom = re.sub(r"^.*\[(.+)\].*$", r"\1", ch[2])
+                fab = ch[1].split()[0].replace("Advanced", "AMD")
+                nom = f"{fab} {nom}".strip()
+                break
+    except Exception:
+        pass
+    return -1, (nom[:28] or "Non mesurable")
+
+
+def memoire():
+    info = {}
+    for ligne in lire("/proc/meminfo").splitlines():
+        k, _, v = ligne.partition(":")
+        info[k] = int(v.split()[0]) if v.split() else 0
+    total = info.get("MemTotal", 1)
+    dispo = info.get("MemAvailable", info.get("MemFree", 0))
+    utilise = total - dispo
+    return 100.0 * utilise / total, f"{nombre(utilise / 1048576)} / {nombre(total / 1048576)} Go"
+
+
+def disque():
+    try:
+        u = shutil.disk_usage(os.environ.get("HOME", "/"))
+    except OSError:
+        return 0.0, ""
+    return 100.0 * u.used / u.total, f"{u.free / 1e9:.0f} Go libres sur {u.total / 1e9:.0f}"
+
+
+def main():
+    cpu, cpu_txt = processeur()
+    gpu, gpu_txt = graphique()
+    mem, mem_txt = memoire()
+    dsk, dsk_txt = disque()
+    print(json.dumps({"cpu": round(cpu, 1), "cpuTxt": cpu_txt, "gpu": round(gpu, 1), "gpuTxt": gpu_txt,
+                      "mem": round(mem, 1), "memTxt": mem_txt, "disque": round(dsk, 1), "disqueTxt": dsk_txt},
+                     ensure_ascii=False))
+
+
+if __name__ == "__main__":
+    main()

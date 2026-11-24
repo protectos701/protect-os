@@ -1,7 +1,0 @@
-[Config]
-chartFace=org.kde.ksysguard.piechart
-highPrioritySensorIds=["disk/all/usedPercent"]
-totalSensors=["disk/all/usedPercent"]
-lowPrioritySensorIds=["disk/all/free", "disk/all/total"]
-
-[FaceConfig]

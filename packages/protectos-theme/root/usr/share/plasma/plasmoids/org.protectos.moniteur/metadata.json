@@ -1,0 +1,16 @@
+{
+    "KPackageStructure": "Plasma/Applet",
+    "KPlugin": {
+        "Authors": [{"Name": "protect.OS"}],
+        "Category": "System Information",
+        "Description": "Processeur, carte graphique, mémoire et disque en temps réel",
+        "EnabledByDefault": true,
+        "FormFactors": ["desktop"],
+        "Icon": "utilities-system-monitor",
+        "Id": "org.protectos.moniteur",
+        "License": "GPL-2.0+",
+        "Name": "Moniteur protect.OS",
+        "Version": "1.0"
+    },
+    "X-Plasma-API-Minimum-Version": "6.0"
+}

@@ -60,14 +60,8 @@ var moniteur = true; // moniteur-bureau
 if (moniteur && desktopsArray.length > 0) {
     var bureau = desktopsArray[0];
     var ecran = screenGeometry(bureau.screen);
-    // Jauges préréglées de protect.OS (titres en français, couleurs du thème)
-    var jauges = ["processeur", "graphique", "memoire", "disque"];
-    var marge = 12;
-    var hauteur = Math.min(190, Math.floor((ecran.height - 110) / jauges.length) - marge);
-    var largeur = Math.round(hauteur * 1.2);
-    var x = ecran.width - largeur - 28;
-    var y = 24;
-    for (var k = 0; k < jauges.length; k++) {
-        bureau.addWidget("org.protectos.moniteur." + jauges[k], x, y + k * (hauteur + marge), largeur, hauteur);
-    }
+    // Moniteur protect.OS : un gadget, quatre anneaux dorés (processeur, carte graphique, mémoire, disque)
+    var hauteur = Math.min(760, ecran.height - 110);
+    var largeur = Math.round(Math.max(170, Math.min(220, hauteur * 0.29)));
+    bureau.addWidget("org.protectos.moniteur", ecran.width - largeur - 28, 24, largeur, hauteur);
 }

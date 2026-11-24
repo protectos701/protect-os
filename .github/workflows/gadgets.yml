@@ -13,7 +13,7 @@ jobs:
         run: |
           apt-get update
           apt-get install -y --no-install-recommends plasma-workspace plasma-desktop ksystemstats xvfb x11-apps \
-            imagemagick python3-pil dbus-x11 fonts-noto-core qml6-module-org-kde-ksysguard 2>&1 | tail -3 || true
+            imagemagick python3-pil dbus-x11 pciutils fonts-noto-core qml6-module-org-kde-ksysguard 2>&1 | tail -3 || true
           ls /usr/share/plasma/plasmoids | grep -i systemmonitor || true
           for f in $(find /usr/share/plasma/plasmoids/org.kde.plasma.systemmonitor.cpu /usr/share/plasma/plasmoids/org.kde.plasma.systemmonitor.memory -type f); do echo "--- $f"; cat "$f"; echo; done
           ls /usr/share/ksysguard/sensorfaces 2>/dev/null || find / -path /proc -prune -o -name '*piechart*' -print 2>/dev/null | head
@@ -29,7 +29,9 @@ jobs:
           ls /usr/lib/systemd/user | grep -i ksystemstats || true
           touch ksystemstats.log   # le service n'est PAS démarré à la main : il doit l'être tout seul
           cp -r packages/protectos-theme/root/usr/share/plasma/plasmoids/org.protectos.* /usr/share/plasma/plasmoids/
-          for p in org.protectos.moniteur.processeur; do
+          mkdir -p /usr/lib/protectos && cp packages/protectos-theme/root/usr/lib/protectos/protectos-mesures /usr/lib/protectos/
+          /usr/lib/protectos/protectos-mesures
+          for p in org.protectos.moniteur; do
             echo "===== $p"
             timeout 14 plasmawindowed $p > $p.log 2>&1 &
             sleep 12
@@ -40,8 +42,8 @@ jobs:
           python3 - <<'PY'
           import base64, io
           from PIL import Image
-          for p in ["org.protectos.moniteur.processeur"]:
-              b = io.BytesIO(); Image.open(p + ".png").convert("RGB").crop((0, 0, 320, 240)).save(b, "JPEG", quality=85)
+          for p in ["org.protectos.moniteur"]:
+              b = io.BytesIO(); Image.open(p + ".png").convert("RGB").crop((0, 0, 400, 800)).save(b, "JPEG", quality=85)
               d = base64.b64encode(b.getvalue()).decode()
               print("APERCU-DEBUT " + p)
               for i in range(0, len(d), 900): print(d[i:i + 900])

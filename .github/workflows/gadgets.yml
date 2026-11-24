@@ -31,7 +31,7 @@ jobs:
             timeout 14 plasmawindowed $p > $p.log 2>&1 &
             sleep 12
             xwd -root -silent | convert xwd:- $p.png
-            grep -v "^$" $p.log | head -40
+            grep -v "^$" $p.log | head -40 || true
           done
           echo "===== ksystemstats"; head -20 ksystemstats.log
           python3 - <<'PY'

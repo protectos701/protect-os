@@ -26,8 +26,9 @@ jobs:
           eval $(dbus-launch --sh-syntax)
           (ksystemstats > ksystemstats.log 2>&1 &) ; sleep 3
           cp -r packages/protectos-theme/root/usr/share/plasma/plasmoids/org.protectos.* /usr/share/plasma/plasmoids/
-          for p in org.protectos.moniteur.processeur org.protectos.moniteur.graphique org.protectos.moniteur.memoire org.protectos.moniteur.disque; do
+          for p in org.protectos.moniteur.processeur org.protectos.moniteur.memoire; do
             echo "===== $p"
+            if [ "$p" = org.protectos.moniteur.memoire ]; then export QT_QUICK_BACKEND=software; echo "(rendu logiciel)"; fi
             timeout 14 plasmawindowed $p > $p.log 2>&1 &
             sleep 12
             xwd -root -silent | convert xwd:- $p.png
@@ -37,7 +38,7 @@ jobs:
           python3 - <<'PY'
           import base64, io
           from PIL import Image
-          for p in ["org.protectos.moniteur.processeur", "org.protectos.moniteur.graphique", "org.protectos.moniteur.memoire", "org.protectos.moniteur.disque"]:
+          for p in ["org.protectos.moniteur.processeur", "org.protectos.moniteur.memoire"]:
               b = io.BytesIO(); Image.open(p + ".png").convert("RGB").crop((0, 0, 320, 240)).save(b, "JPEG", quality=85)
               d = base64.b64encode(b.getvalue()).decode()
               print("APERCU-DEBUT " + p)

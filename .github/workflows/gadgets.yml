@@ -15,6 +15,7 @@ jobs:
           apt-get install -y --no-install-recommends plasma-workspace plasma-desktop ksystemstats xvfb x11-apps \
             imagemagick python3-pil dbus-x11 fonts-noto-core qml6-module-org-kde-ksysguard 2>&1 | tail -3 || true
           ls /usr/share/plasma/plasmoids | grep -i systemmonitor || true
+          for f in $(find /usr/share/plasma/plasmoids/org.kde.plasma.systemmonitor.cpu /usr/share/plasma/plasmoids/org.kde.plasma.systemmonitor.memory -type f); do echo "--- $f"; cat "$f"; echo; done
           ls /usr/share/ksysguard/sensorfaces 2>/dev/null || find / -path /proc -prune -o -name '*piechart*' -print 2>/dev/null | head
       - name: Lancer la jauge
         shell: bash

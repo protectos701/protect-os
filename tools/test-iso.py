@@ -160,7 +160,7 @@ def visite(qmp, sortie):
         ("menu-demarrer", lambda: touches(qmp, "meta_l"), 3, lambda: touches(qmp, "esc")),
         ("explorateur", lambda: touches(qmp, "meta_l", "e"), 7, None),
         ("parametres", lambda: touches(qmp, "meta_l", "i"), 9, None),
-        ("horloge", lambda: clic(qmp, 0.91, 0.965), 8, lambda: touches(qmp, "esc")),
+        ("horloge", lambda: clic(qmp, 0.932, 0.965), 8, lambda: touches(qmp, "esc")),
         ("alt-tab", lambda: touches(qmp, "alt", "tab", tenir=14000), 9, None),
     ]:
         try:

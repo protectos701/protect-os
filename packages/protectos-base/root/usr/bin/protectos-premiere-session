@@ -48,7 +48,8 @@ def emplacements_xbel():
               '<xbel xmlns:bookmark="http://www.freedesktop.org/standards/desktop-bookmarks" '
               'xmlns:mime="http://www.freedesktop.org/standards/shared-mime-info" '
               'xmlns:kdepriv="http://www.kde.org/kdepriv">',
-              " <info>", '  <metadata owner="http://www.kde.org">', "   <kde_places_version>4</kde_places_version>"]
+              " <info>", '  <metadata owner="http://www.kde.org">', "   <kde_places_version>4</kde_places_version>",
+              "   <withRecentlyUsed>true</withRecentlyUsed>", "   <withBaloo>true</withBaloo>"]
     for g in ("Places", "Devices", "RemovableDevices"):
         lignes.append(f"   <GroupState-{g}-IsHidden>false</GroupState-{g}-IsHidden>")
     for g in GROUPES_CACHES:

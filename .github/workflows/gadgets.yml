@@ -13,7 +13,7 @@ jobs:
         run: |
           apt-get update
           apt-get install -y --no-install-recommends plasma-workspace plasma-desktop ksystemstats xvfb x11-apps \
-            imagemagick python3-pil dbus-x11 pciutils qt6-declarative-dev-tools qml6-module-qtquick-window fonts-noto-core qml6-module-org-kde-ksysguard 2>&1 | tail -3 || true
+            imagemagick python3-pil dbus-x11 pciutils ca-certificates qt6-declarative-dev-tools qml6-module-qtquick-window fonts-noto-core qml6-module-org-kde-ksysguard 2>&1 | tail -3 || true
           ls /usr/share/plasma/plasmoids | grep -i systemmonitor || true
           for f in $(find /usr/share/plasma/plasmoids/org.kde.plasma.systemmonitor.cpu /usr/share/plasma/plasmoids/org.kde.plasma.systemmonitor.memory -type f); do echo "--- $f"; cat "$f"; echo; done
           ls /usr/share/ksysguard/sensorfaces 2>/dev/null || find / -path /proc -prune -o -name '*piechart*' -print 2>/dev/null | head
@@ -39,7 +39,8 @@ jobs:
             grep -v "^$" $p.log | head -40 || true
           done
           echo "===== planche météo"
-          QML=$( (command -v qml6; command -v qml; find /usr/lib -path "*qt6/bin/qml" -type f 2>/dev/null) | head -1 || true); echo "outil : $QML"
+          QML=$( (command -v qml6; command -v qml; find /usr -name qml -path "*qt6*" 2>/dev/null) | head -1 || true); echo "outil : $QML"
+          dpkg -L qt6-declarative-dev-tools 2>/dev/null | grep -E "/qml$|/qml6$" || true
           timeout 16 "$QML" tools/planche-meteo.qml > planche.log 2>&1 &
           sleep 9; xwd -root -silent | convert xwd:- planche-meteo.png; head -20 planche.log || true
           python3 - <<'PY'

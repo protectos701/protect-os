@@ -86,6 +86,7 @@ def sauvegarder(c, journal=print):
     while nom in precedentes:  # deux sauvegardes dans la même minute
         nom, n = f"{base} ({n})", n + 1
     cible = os.path.join(r, nom)
+    os.makedirs(cible, exist_ok=True)   # rsync ne crée que le dernier niveau du dossier
     for code in c["dossiers"]:
         src = dossier_xdg(code)
         if not src or not os.path.isdir(src):

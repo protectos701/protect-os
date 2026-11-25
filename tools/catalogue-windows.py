@@ -20,12 +20,21 @@ API = "https://api.github.com/repos/microsoft/winget-pkgs/contents/"
 TYPES_OK = ("inno", "nullsoft", "exe", "msi", "wix", "burn")
 
 
-def obtenir(url, api=True):
-    req = urllib.request.Request(url, headers={"User-Agent": "protect.OS-catalogue"})
-    if api and os.environ.get("GITHUB_TOKEN"):
-        req.add_header("Authorization", "Bearer " + os.environ["GITHUB_TOKEN"])
-    with urllib.request.urlopen(req, timeout=30) as r:
-        return r.read()
+def obtenir(url, api=True, essais=4):
+    """Télécharge ; si le serveur demande de ralentir (429), attend puis réessaie."""
+    import time
+    import urllib.error
+    for essai in range(essais):
+        req = urllib.request.Request(url, headers={"User-Agent": "protect.OS-catalogue"})
+        if api and os.environ.get("GITHUB_TOKEN"):
+            req.add_header("Authorization", "Bearer " + os.environ["GITHUB_TOKEN"])
+        try:
+            with urllib.request.urlopen(req, timeout=30) as r:
+                return r.read()
+        except urllib.error.HTTPError as e:
+            if e.code not in (429, 502, 503) or essai == essais - 1:
+                raise
+            time.sleep(int(e.headers.get("Retry-After") or 0) or 15 * (essai + 1))
 
 
 def lister(chemin):
@@ -140,6 +149,11 @@ def programme(entree):
 
 def main():
     liste = json.load(open(os.path.join(ROOT, "tools", "catalogue-liste.json"), encoding="utf-8"))["programmes"]
+    try:  # version précédente : un programme momentanément injoignable garde son ancienne fiche
+        precedent = {p["id"]: p for p in json.load(open(os.path.join(ROOT, "apps", "catalogue-windows.json"),
+                                                         encoding="utf-8"))["programmes"]}
+    except (OSError, ValueError, KeyError):
+        precedent = {}
     sortie, erreurs = [], 0
     for e in liste:
         try:
@@ -148,7 +162,13 @@ def main():
             print(f"  ✓ {p['nom']} {p['version']} ({p['type']}, {p['architecture']}) icône : {p['icone'] or 'aucune'}")
         except Exception as ex:
             erreurs += 1
-            print(f"  ✗ {e['id']} : {ex}")
+            if e["id"] in precedent:
+                ancien = {**precedent[e["id"]], "categorie": e["categorie"],
+                          "description": e.get("description") or precedent[e["id"]].get("description", "")}
+                sortie.append(ancien)
+                print(f"  ↺ {e['id']} : {ex} — fiche précédente conservée ({ancien['version']})")
+            else:
+                print(f"  ✗ {e['id']} : {ex}")
     if not sortie:
         print("Catalogue vide : rien n'est écrit")
         return 1

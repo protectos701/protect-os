@@ -57,7 +57,8 @@ Item {
         id: astre
         width: scene.height * 0.5; height: width
         x: scene.width * 0.16; y: scene.height * 0.14
-        opacity: scene.condition === "brouillard" ? 0.35 : 1
+        // Par ciel couvert, pluie, neige ou orage, le soleil (ou la lune) est presque caché
+        opacity: scene.condition === "brouillard" ? 0.35 : scene.couverture >= 1 ? 0.28 : 1
         Behavior on opacity { NumberAnimation { duration: 1500 } }
 
         Item {  // rayons qui tournent

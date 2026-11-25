@@ -16,6 +16,25 @@ for f in $(find . -path ./chroot -prune -o \( -name '*.cfg' -o -name 'theme.txt'
 		"$f"
 	echo "Menu de démarrage : textes de $f"
 done
+# Démarrage direct, comme Windows : le menu est caché, protect.OS démarre au bout de 2 secondes.
+# (Échap au démarrage pour afficher le menu : mode sans échec, test de la mémoire…)
+for f in boot/grub/*.cfg; do
+	[ -f "$f" ] || continue
+	sed -i -E 's/^([[:space:]]*)set timeout=[0-9-]+/\1set timeout=2/' "$f"
+	sed -i -E 's/^([[:space:]]*)set timeout_style=[a-z]+/\1set timeout_style=hidden/' "$f"
+done
+if [ -f boot/grub/grub.cfg ]; then
+	grep -q "timeout_style" boot/grub/grub.cfg || sed -i '1i set timeout_style=hidden\nset timeout=2' boot/grub/grub.cfg
+	echo "Menu de démarrage (UEFI) caché"
+fi
+for f in isolinux/isolinux.cfg isolinux/menu.cfg syslinux/syslinux.cfg; do
+	[ -f "$f" ] || continue
+	sed -i -E 's/^([[:space:]]*)timeout [0-9]+/\1timeout 20/I' "$f"
+	grep -qi "^timeout" "$f" || echo "timeout 20" >> "$f"
+	grep -qi "menu hidden" "$f" || echo "menu hidden" >> "$f"
+	echo "Menu de démarrage (BIOS) caché : $f"
+done
+
 python3 - <<'PY'
 import glob, os
 from PIL import Image, ImageDraw, ImageFont, ImageOps

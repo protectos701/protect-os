@@ -38,3 +38,4 @@ systemd-zram-generator
 power-profiles-daemon
 ksystemstats
 qml6-module-org-kde-ksysguard
+fonts-inter

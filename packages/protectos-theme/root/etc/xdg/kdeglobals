@@ -29,6 +29,17 @@ kcm_plasmasearch=true
 [Sounds]
 Theme=protectos
 
+# Police protect.OS : Inter, moderne et très lisible (proche de celle de Windows 11).
+# Si elle n'est pas installée, le système reprend sa police habituelle.
+[General]
+font=Inter,10,-1,5,400,0,0,0,0,0,0,0,0,0,0,1
+menuFont=Inter,10,-1,5,400,0,0,0,0,0,0,0,0,0,0,1
+toolBarFont=Inter,10,-1,5,400,0,0,0,0,0,0,0,0,0,0,1
+smallestReadableFont=Inter,8,-1,5,400,0,0,0,0,0,0,0,0,0,0,1
+
+[WM]
+activeFont=Inter,10,-1,5,600,0,0,0,0,0,0,0,0,0,0,1
+
 # --- Couleurs protect.OS (copiées du jeu de couleurs par tools/personnaliser.py) ---
 [Colors:Button]
 BackgroundAlternate=30,48,100

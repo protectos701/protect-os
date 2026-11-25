@@ -57,16 +57,28 @@ Presentation {
         texte: "Un système rapide et protégé, en bleu et or, pensé pour vous."
     }
     ProtectSlide {
-        titre: "Tout est prêt dès le départ"
-        texte: "Firefox, LibreOffice, VLC, un explorateur de fichiers et un terminal sont déjà installés."
+        titre: "Vos programmes Windows"
+        texte: "Double-cliquez sur un .exe pour l'installer, ou choisissez parmi les programmes vérifiés du Magasin d'applications."
     }
     ProtectSlide {
-        titre: "Des milliers d'applications"
-        texte: "Ouvrez le Magasin d'applications pour installer jeux, logiciels créatifs et outils."
+        titre: "Protégé dès le premier jour"
+        texte: "Antivirus, pare-feu, bloqueur de publicités et de pisteurs : tout se règle dans le Centre de protection."
+    }
+    ProtectSlide {
+        titre: "La météo d'un clic"
+        texte: "Cliquez sur l'heure : météo animée, calendrier et toutes vos notifications."
+    }
+    ProtectSlide {
+        titre: "Des réglages simples"
+        texte: "Le panneau Paramètres (Windows+I) rassemble le Wi-Fi, le son, l'affichage, le fond d'écran et le thème."
+    }
+    ProtectSlide {
+        titre: "Pour toute la famille"
+        texte: "Contrôle parental : temps d'écran, horaires et filtrage des sites pour chaque enfant."
     }
     ProtectSlide {
         titre: "Toujours à jour"
-        texte: "Les mises à jour de sécurité s'installent toutes seules, chaque jour."
+        texte: "Les correctifs de sécurité s'installent tout seuls, chaque jour, sans vous déranger."
     }
 
     function onActivate() { presentation.currentSlide = 0; }

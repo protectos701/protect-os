@@ -39,9 +39,9 @@ jobs:
             grep -v "^$" $p.log | head -40 || true
           done
           echo "===== planche météo"
-          QML=$(ls /usr/lib/qt6/bin/qml /usr/lib/*/qt6/bin/qml 2>/dev/null | head -1); echo "outil : $QML"
+          QML=$( (command -v qml6; command -v qml; find /usr/lib -path "*qt6/bin/qml" -type f 2>/dev/null) | head -1 || true); echo "outil : $QML"
           timeout 16 "$QML" tools/planche-meteo.qml > planche.log 2>&1 &
-          sleep 9; xwd -root -silent | convert xwd:- planche-meteo.png; cat planche.log | head -20
+          sleep 9; xwd -root -silent | convert xwd:- planche-meteo.png; head -20 planche.log || true
           python3 - <<'PY'
           import base64, io
           from PIL import Image

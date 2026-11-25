@@ -86,6 +86,14 @@ jobs:
           sudo apt-get install -y --no-install-recommends qemu-system-x86 xorriso python3-pil
           python3 tools/test-iso.py iso/*.iso -o captures
 
+      # Démarrage comme un vrai PC UEFI (avec le menu) : une capture toutes les 2 secondes
+      - name: Démarrage réel (UEFI)
+        continue-on-error: true
+        run: |
+          sudo apt-get install -y --no-install-recommends ovmf
+          sudo chmod 666 /dev/kvm 2>/dev/null || true
+          python3 tools/demarrage-reel.py iso/*.iso captures/demarrage
+
       - uses: actions/upload-artifact@v4
         if: always()
         with:

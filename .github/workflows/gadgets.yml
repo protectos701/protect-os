@@ -13,7 +13,7 @@ jobs:
         run: |
           apt-get update
           apt-get install -y --no-install-recommends plasma-workspace plasma-desktop ksystemstats xvfb x11-apps \
-            imagemagick python3-pil dbus-x11 pciutils fonts-noto-core qml6-module-org-kde-ksysguard 2>&1 | tail -3 || true
+            imagemagick python3-pil dbus-x11 pciutils qt6-declarative-dev-tools qml6-module-qtquick-window fonts-noto-core qml6-module-org-kde-ksysguard 2>&1 | tail -3 || true
           ls /usr/share/plasma/plasmoids | grep -i systemmonitor || true
           for f in $(find /usr/share/plasma/plasmoids/org.kde.plasma.systemmonitor.cpu /usr/share/plasma/plasmoids/org.kde.plasma.systemmonitor.memory -type f); do echo "--- $f"; cat "$f"; echo; done
           ls /usr/share/ksysguard/sensorfaces 2>/dev/null || find / -path /proc -prune -o -name '*piechart*' -print 2>/dev/null | head
@@ -31,19 +31,22 @@ jobs:
           cp -r packages/protectos-theme/root/usr/share/plasma/plasmoids/org.protectos.* /usr/share/plasma/plasmoids/
           mkdir -p /usr/lib/protectos && cp packages/protectos-theme/root/usr/lib/protectos/protectos-mesures /usr/lib/protectos/
           /usr/lib/protectos/protectos-mesures
-          for p in org.protectos.moniteur; do
+          for p in org.protectos.horloge; do
             echo "===== $p"
-            timeout 14 plasmawindowed $p > $p.log 2>&1 &
-            sleep 12
+            timeout 30 plasmawindowed $p > $p.log 2>&1 &
+            sleep 26
             xwd -root -silent | convert xwd:- $p.png
             grep -v "^$" $p.log | head -40 || true
           done
-          echo "===== ksystemstats"; head -20 ksystemstats.log
+          echo "===== planche météo"
+          QML=$(ls /usr/lib/qt6/bin/qml /usr/lib/*/qt6/bin/qml 2>/dev/null | head -1); echo "outil : $QML"
+          timeout 16 "$QML" tools/planche-meteo.qml > planche.log 2>&1 &
+          sleep 9; xwd -root -silent | convert xwd:- planche-meteo.png; cat planche.log | head -20
           python3 - <<'PY'
           import base64, io
           from PIL import Image
-          for p in ["org.protectos.moniteur"]:
-              b = io.BytesIO(); Image.open(p + ".png").convert("RGB").crop((0, 0, 400, 800)).save(b, "JPEG", quality=85)
+          for p, zone in [("org.protectos.horloge", (0, 0, 520, 800)), ("planche-meteo", (0, 0, 1370, 470))]:
+              b = io.BytesIO(); Image.open(p + ".png").convert("RGB").crop(zone).save(b, "JPEG", quality=85)
               d = base64.b64encode(b.getvalue()).decode()
               print("APERCU-DEBUT " + p)
               for i in range(0, len(d), 900): print(d[i:i + 900])

@@ -1,0 +1,16 @@
+{
+    "KPackageStructure": "Plasma/Applet",
+    "KPlugin": {
+        "Authors": [{"Name": "protect.OS"}],
+        "Category": "Date and Time",
+        "Description": "Heure, date, météo animée, calendrier et notifications",
+        "EnabledByDefault": true,
+        "FormFactors": ["panel", "desktop"],
+        "Icon": "preferences-system-time",
+        "Id": "org.protectos.horloge",
+        "License": "GPL-2.0+",
+        "Name": "Horloge protect.OS",
+        "Version": "1.0"
+    },
+    "X-Plasma-API-Minimum-Version": "6.0"
+}

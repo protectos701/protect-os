@@ -60,6 +60,23 @@ for p in plasma-welcome kdeconnect khelpcenter konqueror kwalletmanager xterm ku
 	fi
 done
 
+echo "protect.OS : pointeur de souris bleu et or (d'après le pointeur Brise)"
+SRC=/usr/share/icons/breeze_cursors
+DST=/usr/share/icons/ProtectOS-curseurs
+if [ -d "$SRC/cursors_scalable" ]; then
+	rm -rf "$DST"; mkdir -p "$DST"
+	cp -r "$SRC/cursors_scalable" "$DST/"
+	ln -s ../breeze_cursors/cursors "$DST/cursors"   # applications X11 : pointeur Brise d'origine
+	# Corps bleu nuit, contour doré
+	find "$DST/cursors_scalable" -name '*.svg' -exec sed -i \
+		-e 's/#232629/#0a1a52/gI' -e 's/#31363b/#0a1a52/gI' -e 's/#000000/#0a1a52/gI' \
+		-e 's/#fcfcfc/#f3d27a/gI' -e 's/#ffffff/#f3d27a/gI' -e 's/#eff0f1/#f3d27a/gI' {} +
+	printf '[Icon Theme]\nName=protect.OS\nComment=Pointeur bleu et or\nInherits=breeze_cursors\n' > "$DST/index.theme"
+	echo "  $(find "$DST/cursors_scalable" -name '*.svg' | wc -l) pointeurs recolorés"
+else
+	echo "  pointeur Brise vectoriel absent : pointeur par défaut conservé"
+fi
+
 echo "protect.OS : identité appliquée à tous les logiciels installés"
 /usr/lib/protectos/protectos-identite tout || true
 /usr/lib/protectos/protectos-identite avatar || true

@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Créer une application
+Comment=Transformer une page HTML ou un site en application
+Exec=protectos-appli-web --creer %f
+Icon=applications-internet
+Terminal=false
+MimeType=text/html;
+Categories=Qt;Utility;
+Keywords=html;web;application;site;page;

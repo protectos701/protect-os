@@ -108,7 +108,10 @@ def sauvegarder(c, journal=print):
 
 
 def notifier(titre, texte):
-    subprocess.run(["notify-send", "-a", "Sauvegarde", "-i", "document-save", titre, texte], capture_output=True)
+    try:
+        subprocess.run(["notify-send", "-a", "Sauvegarde", "-i", "document-save", titre, texte], capture_output=True)
+    except OSError:
+        pass
 
 
 def mode_auto():

@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Service
+MimeType=text/html;
+Actions=appli
+X-KDE-Priority=TopLevel
+
+[Desktop Action appli]
+Name=Ouvrir comme une application…
+Icon=applications-internet
+Exec=protectos-appli-web --creer %f

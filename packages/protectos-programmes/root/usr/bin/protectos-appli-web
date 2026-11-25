@@ -1,0 +1,188 @@
+#!/usr/bin/python3
+"""Pages HTML et sites web en vraies applications protect.OS.
+
+  protectos-appli-web --nom "Ma compta" chemin/index.html     ouvre la page dans sa propre fenêtre
+  protectos-appli-web --creer [fichier.html]                   crée une application (menu Démarrer)
+
+Chaque application garde ses propres données (localStorage, IndexedDB, cookies) entre deux ouvertures.
+"""
+import os
+import re
+import shutil
+import subprocess
+import sys
+import unicodedata
+from urllib.parse import urlparse
+
+APPS = os.path.expanduser("~/.local/share/applications")
+DONNEES = os.path.expanduser("~/.local/share/protectos/applis-web")
+OR = "#d4a72c"
+
+
+def slug(t):
+    t = unicodedata.normalize("NFKD", t).encode("ascii", "ignore").decode()
+    return re.sub(r"[^a-z0-9]+", "-", t.lower()).strip("-") or "appli"
+
+
+def cible_absolue(c):
+    if re.match(r"^[a-z]+://", c):
+        return c
+    c = os.path.abspath(os.path.expanduser(c))
+    if os.path.isdir(c):
+        c = os.path.join(c, "index.html")
+    return c
+
+
+def creer_raccourci(nom, cible, icone=""):
+    os.makedirs(APPS, exist_ok=True)
+    s = slug(nom)
+    chemin = os.path.join(APPS, f"protectos-web-{s}.desktop")
+    cible = cible_absolue(cible)
+    if not icone and not re.match(r"^[a-z]+://", cible):
+        dossier = os.path.dirname(cible)
+        for n in ("icon.png", "icone.png", "favicon.png", "logo.png", "icon.svg", "favicon.ico"):
+            if os.path.exists(os.path.join(dossier, n)):
+                icone = os.path.join(dossier, n)
+                break
+    q = lambda x: '"' + x.replace("\\", "\\\\").replace('"', '\\"') + '"'  # noqa: E731
+    with open(chemin, "w", encoding="utf-8") as f:
+        f.write("[Desktop Entry]\nType=Application\n"
+                f"Name={nom}\nComment=Application protect.OS\n"
+                f"Exec=protectos-appli-web --nom {q(nom)} {q(cible)}\n"
+                f"Icon={icone or 'applications-internet'}\nTerminal=false\n"
+                f"Categories=Network;Office;\nStartupWMClass=protectos-web-{s}\n")
+    os.chmod(chemin, 0o755)
+    if shutil.which("update-desktop-database"):
+        subprocess.run(["update-desktop-database", "-q", APPS], capture_output=True)
+    return chemin
+
+
+def ouvrir(nom, cible):
+    from PyQt6.QtCore import QUrl
+    from PyQt6.QtGui import QIcon
+    from PyQt6.QtWidgets import QApplication, QMainWindow
+    try:
+        from PyQt6.QtWebEngineCore import QWebEnginePage, QWebEngineProfile, QWebEngineSettings
+        from PyQt6.QtWebEngineWidgets import QWebEngineView
+    except ImportError:
+        # Sans moteur web intégré : la page s'ouvre dans le navigateur
+        url = cible if re.match(r"^[a-z]+://", cible) else "file://" + cible
+        os.execvp("xdg-open", ["xdg-open", url])
+
+    app = QApplication(sys.argv)
+    app.setApplicationName(nom)
+    app.setDesktopFileName(f"protectos-web-{slug(nom)}")
+    profil = QWebEngineProfile(slug(nom), app)  # données propres à cette application, gardées sur le disque
+    profil.setPersistentStoragePath(os.path.join(DONNEES, slug(nom)))
+    profil.setCachePath(os.path.join(DONNEES, slug(nom), "cache"))
+    profil.setPersistentCookiesPolicy(QWebEngineProfile.PersistentCookiesPolicy.ForcePersistentCookies)
+    reg = profil.settings()
+    reg.setAttribute(QWebEngineSettings.WebAttribute.LocalContentCanAccessFileUrls, True)
+    reg.setAttribute(QWebEngineSettings.WebAttribute.LocalContentCanAccessRemoteUrls, True)
+    reg.setAttribute(QWebEngineSettings.WebAttribute.LocalStorageEnabled, True)
+
+    def telechargement(dl):
+        dossier = (subprocess.run(["xdg-user-dir", "DOWNLOAD"], capture_output=True, text=True).stdout.strip()
+                   if shutil.which("xdg-user-dir") else "")
+        dl.setDownloadDirectory(dossier or os.path.expanduser("~"))
+        dl.accept()
+    profil.downloadRequested.connect(telechargement)
+
+    fenetres = []
+
+    class Page(QWebEnginePage):
+        def createWindow(self, _type):  # liens « nouvelle fenêtre » : une fenêtre de plus
+            return nouvelle_fenetre(None).page()
+
+    def nouvelle_fenetre(url):
+        w = QMainWindow()
+        vue = QWebEngineView()
+        vue.setPage(Page(profil, vue))
+        vue.titleChanged.connect(lambda t: w.setWindowTitle(t or nom))
+        vue.iconChanged.connect(lambda ic: w.setWindowIcon(ic) if not ic.isNull() else None)
+        w.setCentralWidget(vue)
+        w.setWindowTitle(nom)
+        w.resize(1200, 800)
+        if url:
+            vue.setUrl(url)
+        w.show()
+        fenetres.append(w)
+        return vue
+
+    url = QUrl(cible) if re.match(r"^[a-z]+://", cible) else QUrl.fromLocalFile(cible)
+    nouvelle_fenetre(url)
+    return app.exec()
+
+
+def assistant(fichier=""):
+    from PyQt6.QtGui import QIcon
+    from PyQt6.QtWidgets import (QApplication, QDialog, QFileDialog, QHBoxLayout, QLabel, QLineEdit,
+                                 QPushButton, QVBoxLayout)
+    app = QApplication(sys.argv)
+    d = QDialog()
+    d.setWindowTitle("Créer une application")
+    d.setWindowIcon(QIcon.fromTheme("applications-internet"))
+    d.setMinimumWidth(560)
+    d.setStyleSheet(f"QPushButton#principal {{ background: {OR}; color: #1a1405; border: none; border-radius: 6px;"
+                    "padding: 8px 18px; font-weight: bold; }")
+    lay = QVBoxLayout(d)
+    lay.addWidget(QLabel("<b>Transformez une page HTML ou un site en application.</b><br>"
+                         "Elle aura sa propre fenêtre et son icône dans le menu Démarrer."))
+    cible = QLineEdit(fichier)
+    cible.setPlaceholderText("Fichier .html, dossier contenant index.html, ou adresse https://…")
+    parcourir = QPushButton(QIcon.fromTheme("document-open"), "Parcourir…")
+    parcourir.clicked.connect(lambda: cible.setText(
+        QFileDialog.getOpenFileName(d, "Choisir la page", os.path.expanduser("~"), "Pages web (*.html *.htm)")[0]
+        or cible.text()))
+    l1 = QHBoxLayout()
+    l1.addWidget(cible, 1)
+    l1.addWidget(parcourir)
+    nom = QLineEdit()
+    nom.setPlaceholderText("Nom de l'application (par exemple : Ma comptabilité)")
+    if fichier:
+        nom.setText(os.path.splitext(os.path.basename(fichier.rstrip("/")))[0].replace("index", "").strip("-_ ")
+                    or os.path.basename(os.path.dirname(os.path.abspath(fichier))))
+    message = QLabel("")
+    creer = QPushButton("Créer l'application")
+    creer.setObjectName("principal")
+
+    def go():
+        c, n = cible.text().strip(), nom.text().strip()
+        if not c or not n:
+            message.setText("Indiquez la page et un nom.")
+            return
+        if not re.match(r"^[a-z]+://", c) and not os.path.exists(cible_absolue(c)):
+            message.setText("Ce fichier est introuvable.")
+            return
+        creer_raccourci(n, c)
+        message.setText(f"<b>« {n} »</b> est dans le menu Démarrer.")
+        subprocess.Popen(["protectos-appli-web", "--nom", n, cible_absolue(c)])
+    creer.clicked.connect(go)
+    for w in (QLabel("Page :"),):
+        lay.addWidget(w)
+    lay.addLayout(l1)
+    lay.addWidget(QLabel("Nom :"))
+    lay.addWidget(nom)
+    lay.addWidget(message)
+    lay.addWidget(creer)
+    d.show()
+    return app.exec()
+
+
+def main():
+    args = sys.argv[1:]
+    if args and args[0] == "--creer":
+        return assistant(args[1] if len(args) > 1 else "")
+    nom = "Application"
+    if "--nom" in args:
+        i = args.index("--nom")
+        nom = args[i + 1]
+        del args[i:i + 2]
+    if not args:
+        print(__doc__)
+        return 2
+    return ouvrir(nom, cible_absolue(args[0]))
+
+
+if __name__ == "__main__":
+    sys.exit(main())

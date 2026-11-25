@@ -12,7 +12,7 @@ Theme=ProtectOS
 name=protectos
 
 [kcminputrc][Mouse]
-cursorTheme=breeze_cursors
+cursorTheme=ProtectOS-curseurs
 
 [kwinrc][org.kde.kdecoration2]
 library=org.kde.breeze

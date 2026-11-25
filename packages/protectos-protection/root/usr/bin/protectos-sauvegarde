@@ -1,0 +1,343 @@
+#!/usr/bin/python3
+"""Sauvegarde de protect.OS : copie automatique de vos documents sur une clé USB ou un disque externe.
+
+Chaque sauvegarde est un dossier daté, complet et lisible tel quel. Les fichiers inchangés ne prennent
+pas de place en plus (liens rsync --link-dest). Les 12 dernières sauvegardes sont gardées.
+
+  protectos-sauvegarde              fenêtre de réglage
+  protectos-sauvegarde --auto       sauvegarde programmée (minuterie quotidienne), si le disque est branché
+  protectos-sauvegarde --maintenant sauvegarde immédiate (texte)
+"""
+import json
+import os
+import shutil
+import subprocess
+import sys
+import time
+
+CONF = os.path.expanduser("~/.config/protectos/sauvegarde.json")
+GARDER = 12
+DOSSIERS = [("DOCUMENTS", "Documents"), ("PICTURES", "Images"), ("MUSIC", "Musique"), ("VIDEOS", "Vidéos"),
+            ("DESKTOP", "Bureau"), ("DOWNLOAD", "Téléchargements")]
+OR = "#d4a72c"
+
+
+def lire_conf():
+    defaut = {"destination": "", "dossiers": ["DOCUMENTS", "PICTURES", "DESKTOP"], "frequence": "jour", "derniere": 0}
+    try:
+        return {**defaut, **json.load(open(CONF, encoding="utf-8"))}
+    except (OSError, ValueError):
+        return defaut
+
+
+def ecrire_conf(c):
+    os.makedirs(os.path.dirname(CONF), exist_ok=True)
+    with open(CONF, "w", encoding="utf-8") as f:
+        json.dump(c, f, ensure_ascii=False, indent=1)
+
+
+def dossier_xdg(nom):
+    try:
+        r = subprocess.run(["xdg-user-dir", nom], capture_output=True, text=True, timeout=3)
+        p = r.stdout.strip()
+        return p if p and p != os.path.expanduser("~") else ""
+    except (OSError, subprocess.TimeoutExpired):
+        return ""
+
+
+def disques_externes():
+    """Clés USB et disques externes montés : [(chemin, nom affiché, Go libres)]."""
+    out = []
+    for base in (f"/media/{os.environ.get('USER', '')}", f"/run/media/{os.environ.get('USER', '')}", "/media"):
+        if not os.path.isdir(base):
+            continue
+        for n in sorted(os.listdir(base)):
+            p = os.path.join(base, n)
+            if os.path.ismount(p) and all(p != o[0] for o in out):
+                try:
+                    libre = shutil.disk_usage(p).free / 1e9
+                except OSError:
+                    continue
+                out.append((p, n, libre))
+    return out
+
+
+def racine(dest):
+    return os.path.join(dest, "Sauvegardes protect.OS", os.uname().nodename + " - " + os.environ.get("USER", ""))
+
+
+def sauvegardes(dest):
+    r = racine(dest)
+    try:
+        return sorted(d for d in os.listdir(r) if d[:4].isdigit())
+    except OSError:
+        return []
+
+
+def sauvegarder(c, journal=print):
+    dest = c["destination"]
+    if not dest or not os.path.ismount(dest):
+        return False, "Le disque de sauvegarde n'est pas branché."
+    r = racine(dest)
+    os.makedirs(r, exist_ok=True)
+    nom = time.strftime("%Y-%m-%d %Hh%M")
+    precedentes = sauvegardes(dest)
+    base, n = nom, 2
+    while nom in precedentes:  # deux sauvegardes dans la même minute
+        nom, n = f"{base} ({n})", n + 1
+    cible = os.path.join(r, nom)
+    for code in c["dossiers"]:
+        src = dossier_xdg(code)
+        if not src or not os.path.isdir(src):
+            continue
+        libelle = dict(DOSSIERS).get(code, code)
+        journal(f"Sauvegarde de « {libelle} »…")
+        cmd = ["rsync", "-a", "--delete", "--modify-window=2", "--no-owner", "--no-group"]
+        if precedentes:
+            cmd.append(f"--link-dest={os.path.join(r, precedentes[-1], libelle)}")
+        cmd += [src.rstrip("/") + "/", os.path.join(cible, libelle) + "/"]
+        res = subprocess.run(cmd, capture_output=True, text=True)
+        if res.returncode not in (0, 23, 24):  # 23/24 : quelques fichiers illisibles ou disparus
+            return False, f"Erreur pendant la copie de « {libelle} » : {res.stderr.strip()[:200]}"
+    for ancienne in sauvegardes(dest)[:-GARDER]:
+        shutil.rmtree(os.path.join(r, ancienne), ignore_errors=True)
+    c["derniere"] = time.time()
+    ecrire_conf(c)
+    return True, f"Sauvegarde terminée : {cible}"
+
+
+def notifier(titre, texte):
+    subprocess.run(["notify-send", "-a", "Sauvegarde", "-i", "document-save", titre, texte], capture_output=True)
+
+
+def mode_auto():
+    c = lire_conf()
+    if not c["destination"] or c["frequence"] == "manuel":
+        return 0
+    delai = 86400 if c["frequence"] == "jour" else 7 * 86400
+    if time.time() - c.get("derniere", 0) < delai - 3600:
+        return 0
+    if not os.path.ismount(c["destination"]):
+        if time.time() - c.get("derniere", 0) > delai * 3:
+            notifier("Sauvegarde en retard", "Branchez votre disque de sauvegarde pour mettre vos documents à l'abri.")
+        return 0
+    ok, msg = sauvegarder(c, journal=lambda _m: None)
+    notifier("Documents sauvegardés" if ok else "Sauvegarde impossible", msg)
+    return 0 if ok else 1
+
+
+if "--auto" in sys.argv:
+    sys.exit(mode_auto())
+if "--maintenant" in sys.argv:
+    ok, msg = sauvegarder(lire_conf())
+    print(msg)
+    sys.exit(0 if ok else 1)
+
+from PyQt6.QtCore import QProcess, Qt, QThread, pyqtSignal  # noqa: E402
+from PyQt6.QtGui import QFont, QIcon  # noqa: E402
+from PyQt6.QtWidgets import (QApplication, QButtonGroup, QCheckBox, QComboBox, QFrame, QGridLayout,  # noqa: E402
+                             QHBoxLayout, QLabel, QProgressBar, QPushButton, QRadioButton, QVBoxLayout, QWidget)
+
+STYLE = f"""
+#banniere {{ background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #16307a, stop:1 #060f2e);
+            border-bottom: 2px solid {OR}; }}
+#banniere QLabel {{ color: #eef2fb; }}
+#etat {{ color: #f3d27a; }}
+QFrame#carte {{ border: 1px solid rgba(212,167,44,0.35); border-radius: 12px; }}
+QLabel#titre {{ color: {OR}; font-weight: bold; }}
+QPushButton#principal {{ background: {OR}; color: #1a1405; border: none; border-radius: 6px; padding: 8px 18px;
+                        font-weight: bold; }}
+QPushButton#principal:disabled {{ background: rgba(212,167,44,0.35); }}
+"""
+
+
+class Tache(QThread):
+    message = pyqtSignal(str)
+    fini = pyqtSignal(bool, str)
+
+    def __init__(self, conf):
+        super().__init__()
+        self.conf = conf
+
+    def run(self):
+        ok, msg = sauvegarder(self.conf, journal=self.message.emit)
+        self.fini.emit(ok, msg)
+
+
+class Fenetre(QWidget):
+    def __init__(self):
+        super().__init__()
+        self.c = lire_conf()
+        self.setWindowTitle("Sauvegarde")
+        self.setWindowIcon(QIcon.fromTheme("document-save"))
+        self.setStyleSheet(STYLE)
+        self.resize(760, 640)
+        self.tache = None
+
+        banniere = QWidget()
+        banniere.setObjectName("banniere")
+        bh = QHBoxLayout(banniere)
+        bh.setContentsMargins(26, 20, 26, 20)
+        ic = QLabel()
+        ic.setPixmap(QIcon.fromTheme("document-save").pixmap(56, 56))
+        bv = QVBoxLayout()
+        self.etat = QLabel()
+        self.etat.setObjectName("etat")
+        f = QFont(self.etat.font())
+        f.setPointSizeF(f.pointSizeF() * 1.6)
+        f.setBold(True)
+        self.etat.setFont(f)
+        self.detail = QLabel()
+        self.detail.setWordWrap(True)
+        bv.addWidget(self.etat)
+        bv.addWidget(self.detail)
+        self.bouton = QPushButton(QIcon.fromTheme("document-save"), "Sauvegarder maintenant")
+        self.bouton.setObjectName("principal")
+        self.bouton.clicked.connect(self.maintenant)
+        bh.addWidget(ic)
+        bh.addSpacing(10)
+        bh.addLayout(bv, 1)
+        bh.addWidget(self.bouton)
+
+        def carte(titre):
+            fr = QFrame()
+            fr.setObjectName("carte")
+            v = QVBoxLayout(fr)
+            v.setContentsMargins(16, 12, 16, 14)
+            t = QLabel(titre)
+            t.setObjectName("titre")
+            v.addWidget(t)
+            return fr, v
+
+        c1, v1 = carte("1. Où sauvegarder ?")
+        self.disques = QComboBox()
+        actu = QPushButton(QIcon.fromTheme("view-refresh"), "")
+        actu.setToolTip("Rechercher les disques branchés")
+        actu.clicked.connect(self.remplir_disques)
+        ligne = QHBoxLayout()
+        ligne.addWidget(self.disques, 1)
+        ligne.addWidget(actu)
+        v1.addLayout(ligne)
+        v1.addWidget(QLabel("Branchez une clé USB ou un disque externe, puis choisissez-le ici."))
+        self.disques.currentIndexChanged.connect(self.choisir_disque)
+
+        c2, v2 = carte("2. Quoi sauvegarder ?")
+        g = QGridLayout()
+        self.cases = {}
+        for i, (code, nom) in enumerate(DOSSIERS):
+            cb = QCheckBox(nom)
+            cb.setChecked(code in self.c["dossiers"])
+            cb.toggled.connect(self.enregistrer)
+            self.cases[code] = cb
+            g.addWidget(cb, i // 3, i % 3)
+        v2.addLayout(g)
+
+        c3, v3 = carte("3. Quand ?")
+        self.freq = QButtonGroup(self)
+        rang = QHBoxLayout()
+        for code, nom in (("jour", "Chaque jour"), ("semaine", "Chaque semaine"), ("manuel", "Seulement quand je clique")):
+            rb = QRadioButton(nom)
+            rb.setProperty("code", code)
+            rb.setChecked(self.c["frequence"] == code)
+            self.freq.addButton(rb)
+            rang.addWidget(rb)
+        self.freq.buttonToggled.connect(lambda *_: self.enregistrer())
+        v3.addLayout(rang)
+        v3.addWidget(QLabel("La sauvegarde se fait toute seule dès que le disque est branché. "
+                            "Les 12 dernières sont gardées."))
+
+        self.barre = QProgressBar()
+        self.barre.setRange(0, 0)
+        self.barre.setVisible(False)
+        self.barre.setMaximumHeight(8)
+        self.message = QLabel("")
+        self.message.setWordWrap(True)
+        restaurer = QPushButton(QIcon.fromTheme("document-open-folder"), "Retrouver un fichier sauvegardé…")
+        restaurer.clicked.connect(self.ouvrir)
+
+        corps = QVBoxLayout()
+        corps.setContentsMargins(22, 16, 22, 18)
+        corps.setSpacing(12)
+        for w in (c1, c2, c3, self.barre, self.message):
+            corps.addWidget(w)
+        corps.addWidget(restaurer, 0, Qt.AlignmentFlag.AlignLeft)
+        corps.addStretch(1)
+        lay = QVBoxLayout(self)
+        lay.setContentsMargins(0, 0, 0, 0)
+        lay.addWidget(banniere)
+        lay.addLayout(corps, 1)
+        self.remplir_disques()
+
+    def remplir_disques(self):
+        self.disques.blockSignals(True)
+        self.disques.clear()
+        for chemin, nom, libre in disques_externes():
+            self.disques.addItem(QIcon.fromTheme("drive-removable-media"), f"{nom}  ({libre:.0f} Go libres)", chemin)
+        if self.c["destination"] and self.disques.findData(self.c["destination"]) < 0:
+            self.disques.addItem(QIcon.fromTheme("drive-removable-media"),
+                                 f"{os.path.basename(self.c['destination'])}  (non branché)", self.c["destination"])
+        if not self.disques.count():
+            self.disques.addItem("Aucun disque externe branché", "")
+        i = self.disques.findData(self.c["destination"])
+        self.disques.setCurrentIndex(max(0, i))
+        self.disques.blockSignals(False)
+        if not self.c["destination"] and self.disques.currentData():
+            self.choisir_disque()
+        self.maj_etat()
+
+    def choisir_disque(self):
+        self.c["destination"] = self.disques.currentData() or ""
+        self.enregistrer()
+
+    def enregistrer(self):
+        self.c["dossiers"] = [k for k, cb in self.cases.items() if cb.isChecked()]
+        b = self.freq.checkedButton()
+        if b:
+            self.c["frequence"] = b.property("code")
+        ecrire_conf(self.c)
+        self.maj_etat()
+
+    def maj_etat(self):
+        d = self.c.get("derniere", 0)
+        if not self.c["destination"]:
+            self.etat.setText("Pas encore de sauvegarde")
+            self.detail.setText("Choisissez un disque externe pour mettre vos documents à l'abri.")
+        elif d:
+            self.etat.setText("Vos documents sont sauvegardés")
+            self.detail.setText(time.strftime("Dernière sauvegarde le %d/%m/%Y à %H:%M", time.localtime(d)))
+        else:
+            self.etat.setText("Prêt à sauvegarder")
+            self.detail.setText("Aucune sauvegarde n'a encore été faite sur ce disque.")
+        self.bouton.setEnabled(bool(self.c["destination"]) and not self.tache)
+
+    def maintenant(self):
+        self.bouton.setEnabled(False)
+        self.barre.setVisible(True)
+        self.tache = Tache(dict(self.c))
+        self.tache.message.connect(self.message.setText)
+        self.tache.fini.connect(self.termine)
+        self.tache.start()
+
+    def termine(self, ok, msg):
+        self.tache = None
+        self.barre.setVisible(False)
+        self.c = lire_conf()
+        self.message.setText(("✓ " if ok else "⚠ ") + msg)
+        self.maj_etat()
+
+    def ouvrir(self):
+        r = racine(self.c["destination"]) if self.c["destination"] else ""
+        QProcess.startDetached("xdg-open", [r if r and os.path.isdir(r) else os.path.expanduser("~")])
+
+
+def main():
+    app = QApplication(sys.argv)
+    app.setApplicationName("Sauvegarde")
+    app.setDesktopFileName("protectos-sauvegarde")
+    w = Fenetre()
+    w.show()
+    return app.exec()
+
+
+if __name__ == "__main__":
+    sys.exit(main())

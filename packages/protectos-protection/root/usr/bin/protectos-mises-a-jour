@@ -60,7 +60,7 @@ def historique(maximum=12):
             if date and maj:
                 paquets = re.findall(r"([a-z0-9][a-z0-9.+-]+):\S+ \(", " ".join(maj))
                 if paquets:
-                    entrees.append((f"{date.group(1)} {date.group(2)[:5]}", paquets))
+                    entrees.append((f"{date.group(1)} {date.group(2)[:5]}", paquets))  # tri chronologique
     entrees.sort(key=lambda e: e[0], reverse=True)
     return entrees[:maximum]
 
@@ -209,6 +209,8 @@ class Centre(QWidget):
             self.liste.addItem("Rien à installer.")
         self.hist.clear()
         for date, paquets in historique():
+            a, m, j = date[:10].split("-") if re.match(r"\d{4}-\d\d-\d\d", date) else ("", "", "")
+            date = f"{j}/{m}/{a} à {date[11:16]}" if a else date
             noms = sorted({nom_lisible(p) for p in paquets})
             plus = f" et {len(noms) - 4} autres" if len(noms) > 4 else ""
             self.hist.addItem(f"{date}  —  {', '.join(noms[:4])}{plus}")

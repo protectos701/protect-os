@@ -4,7 +4,7 @@ Architecture: all
 Maintainer: @MAINTAINER@
 Section: admin
 Priority: optional
-Depends: python3, python3-pyqt6, pkexec | policykit-1, libnotify-bin, util-linux, curl
+Depends: python3, python3-pyqt6, pkexec | policykit-1, libnotify-bin, util-linux, curl, rsync, xdg-user-dirs
 Recommends: clamav, clamav-freshclam, inotify-tools, ufw, unattended-upgrades, timeshift, mokutil, plasma-firewall
 Description: Centre de protection de protect.OS
  Montre d'un coup d'œil si l'ordinateur est protégé : antivirus, pare-feu, mises à

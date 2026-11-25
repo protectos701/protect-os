@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Sauvegarde
+Comment=Copier automatiquement vos documents sur une clé ou un disque externe
+Exec=protectos-sauvegarde
+Icon=document-save
+Terminal=false
+Categories=Qt;System;Utility;
+Keywords=sauvegarde;backup;copie;clé usb;disque externe;restaurer;

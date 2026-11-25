@@ -44,6 +44,8 @@ TUILES = [
      "mise à jour update sécurité"),
     ("Protection", "Centre de protection", "Antivirus, pare-feu, vie privée", "protectos-logo", "cmd:protectos-protection",
      "antivirus pare-feu sécurité protection vie privée"),
+    ("Protection", "Sauvegarde", "Copier vos documents sur un disque externe", "document-save",
+     "cmd:protectos-sauvegarde", "sauvegarde backup copie clé disque externe restaurer"),
     ("Protection", "Verrouillage de l'écran", "Mot de passe au réveil", "system-lock-screen", "kcm:kcm_screenlocker",
      "verrouillage écran mot de passe"),
     ("Appareils", "Imprimantes", "Ajouter et gérer les imprimantes", "printer", "kcm:kcm_printer_manager",

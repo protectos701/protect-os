@@ -1,0 +1,6 @@
+[Unit]
+Description=protect.OS : sauvegarde des documents
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/protectos-sauvegarde --auto

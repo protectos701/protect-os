@@ -10,4 +10,9 @@ if [ "$1" = "configure" ]; then
 		systemctl start protectos-bloqueur.timer >/dev/null 2>&1 || true
 	fi
 fi
+# Sauvegarde des documents : minuterie activée pour tous les comptes (elle ne fait rien tant
+# qu'aucun disque de sauvegarde n'a été choisi)
+if [ "$1" = "configure" ] && command -v systemctl >/dev/null 2>&1; then
+	systemctl --global enable protectos-sauvegarde.timer >/dev/null 2>&1 || true
+fi
 exit 0

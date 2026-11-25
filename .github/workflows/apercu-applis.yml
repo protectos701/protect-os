@@ -22,8 +22,10 @@ jobs:
         run: |
           apt-get update
           apt-get install -y --no-install-recommends python3 python3-pyqt6 python3-pyqt6.qtsvg qt6-svg-plugins \
-            breeze-icon-theme fonts-noto-core fonts-dejavu-core libqt6svg6 locales ca-certificates
+            breeze-icon-theme fonts-noto-core fonts-dejavu-core libqt6svg6 locales ca-certificates rsync
       - uses: actions/checkout@v4
+      - name: Test de la sauvegarde
+        run: python3 tools/test-sauvegarde.py
       - name: Captures
         env:
           LANG: C.UTF-8

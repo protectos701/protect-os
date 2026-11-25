@@ -1,0 +1,10 @@
+[Unit]
+Description=protect.OS : sauvegarde des documents (vérification toutes les heures)
+
+[Timer]
+OnStartupSec=10min
+OnUnitActiveSec=1h
+Persistent=true
+
+[Install]
+WantedBy=timers.target

@@ -40,7 +40,7 @@ TUILES = [
      "compte utilisateur mot de passe photo"),
     ("Comptes", "Contrôle parental", "Temps d'écran et sites pour les enfants", "protectos-logo", "cmd:protectos-parental",
      "enfant parental temps écran filtre"),
-    ("Protection", "Mises à jour", "Garder protect.OS à jour", "system-software-update", "cmd:plasma-discover --mode update",
+    ("Protection", "Mises à jour", "Garder protect.OS à jour", "system-software-update", "cmd:protectos-mises-a-jour",
      "mise à jour update sécurité"),
     ("Protection", "Centre de protection", "Antivirus, pare-feu, vie privée", "protectos-logo", "cmd:protectos-protection",
      "antivirus pare-feu sécurité protection vie privée"),

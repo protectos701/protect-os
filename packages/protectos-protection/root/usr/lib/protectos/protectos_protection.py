@@ -82,7 +82,7 @@ def check_updates(now=None):
         return {**base, "etat": "attention",
                 "detail": f"Automatiques, mais la dernière vérification date de {int(age_days)} jours "
                           "(ordinateur hors ligne ?).",
-                "action": "Vérifier maintenant", "corriger": "lancer:plasma-discover --mode update"}
+                "action": "Vérifier maintenant", "corriger": "lancer:protectos-mises-a-jour"}
     pending = 0
     r = _run(["apt", "list", "--upgradable"])
     if r:
@@ -91,7 +91,7 @@ def check_updates(now=None):
         return {**base, "etat": "attention",
                 "detail": f"Automatiques. {pending} autre{'s' if pending > 1 else ''} mise{'s' if pending > 1 else ''} "
                           f"à jour {'attendent' if pending > 1 else 'attend'} dans le Magasin d'applications.",
-                "action": "Ouvrir Discover", "corriger": "lancer:plasma-discover --mode update"}
+                "action": "Ouvrir Discover", "corriger": "lancer:protectos-mises-a-jour"}
     return {**base, "etat": "ok", "detail": "Automatiques : les correctifs s'installent chaque jour.",
             "action": "", "corriger": ""}
 

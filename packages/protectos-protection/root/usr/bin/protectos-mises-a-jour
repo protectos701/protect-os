@@ -1,0 +1,265 @@
+#!/usr/bin/python3
+"""Centre de mises à jour de protect.OS : état, recherche, installation, historique."""
+import glob
+import gzip
+import os
+import re
+import subprocess
+import sys
+import time
+
+ROOT_HELPER = "/usr/lib/protectos/protectos-protection-root"
+OR = "#d4a72c"
+
+
+def en_attente():
+    """Mises à jour disponibles : [(paquet, nouvelle version)]."""
+    try:
+        r = subprocess.run(["apt", "list", "--upgradable"], capture_output=True, text=True, timeout=60,
+                           env={**os.environ, "LANG": "C"})
+    except (OSError, subprocess.TimeoutExpired):
+        return []
+    out = []
+    for ligne in r.stdout.splitlines():
+        m = re.match(r"^([^/\s]+)/\S+\s+(\S+)", ligne)
+        if m:
+            out.append((m.group(1), m.group(2)))
+    return out
+
+
+def automatique():
+    try:
+        r = subprocess.run(["apt-config", "dump"], capture_output=True, text=True, timeout=10)
+        return 'APT::Periodic::Unattended-Upgrade "1"' in r.stdout
+    except (OSError, subprocess.TimeoutExpired):
+        return False
+
+
+def derniere_verification():
+    t = 0
+    for f in ("/var/lib/protectos/derniere-recherche", "/var/lib/apt/periodic/update-success-stamp",
+              "/var/lib/apt/lists/partial"):
+        try:
+            t = max(t, os.path.getmtime(f))
+        except OSError:
+            pass
+    return t
+
+
+def historique(maximum=12):
+    """Dernières installations, d'après le journal d'APT : [(date, [paquets])]."""
+    entrees = []
+    for f in sorted(glob.glob("/var/log/apt/history.log*"), reverse=True):
+        try:
+            texte = (gzip.open(f, "rt", errors="replace") if f.endswith(".gz") else open(f, errors="replace")).read()
+        except OSError:
+            continue
+        for bloc in texte.split("\n\n"):
+            date = re.search(r"^Start-Date: (\S+)\s+(\S+)", bloc, re.M)
+            maj = re.findall(r"^(?:Upgrade|Install): (.*)$", bloc, re.M)
+            if date and maj:
+                paquets = re.findall(r"([a-z0-9][a-z0-9.+-]+):\S+ \(", " ".join(maj))
+                if paquets:
+                    entrees.append((f"{date.group(1)} {date.group(2)[:5]}", paquets))
+    entrees.sort(key=lambda e: e[0], reverse=True)
+    return entrees[:maximum]
+
+
+def nom_lisible(paquet):
+    if paquet.startswith("protectos-"):
+        return "protect.OS : " + paquet[len("protectos-"):].replace("-", " ")
+    if paquet.startswith(("linux-image", "linux-headers")):
+        return "Noyau du système"
+    return paquet
+
+
+def redemarrage_necessaire():
+    return os.path.exists("/run/reboot-required")
+
+
+def quand(t):
+    if not t:
+        return "jamais"
+    d = time.time() - t
+    if d < 3600:
+        return "il y a quelques minutes"
+    if d < 86400:
+        return f"il y a {int(d // 3600)} h"
+    return time.strftime("le %d/%m/%Y à %H:%M", time.localtime(t))
+
+
+if "--texte" in sys.argv:
+    attente = en_attente()
+    print(f"{len(attente)} mise(s) à jour disponible(s) ; vérification : {quand(derniere_verification())} ; "
+          f"automatique : {'oui' if automatique() else 'non'}")
+    for p, v in attente[:20]:
+        print(f"  {nom_lisible(p)} → {v}")
+    sys.exit(0)
+
+from PyQt6.QtCore import QProcess, Qt  # noqa: E402
+from PyQt6.QtGui import QFont, QIcon  # noqa: E402
+from PyQt6.QtWidgets import (QApplication, QFrame, QHBoxLayout, QLabel, QListWidget, QProgressBar,  # noqa: E402
+                             QPushButton, QVBoxLayout, QWidget)
+
+STYLE = f"""
+#banniere {{ background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #16307a, stop:1 #060f2e);
+            border-bottom: 2px solid {OR}; }}
+#banniere QLabel {{ color: #eef2fb; }}
+#etat {{ color: #f3d27a; }}
+QFrame#carte {{ border: 1px solid rgba(212,167,44,0.35); border-radius: 12px; }}
+QLabel#titre {{ color: {OR}; font-weight: bold; }}
+QPushButton#principal {{ background: {OR}; color: #1a1405; border: none; border-radius: 6px; padding: 8px 18px;
+                        font-weight: bold; }}
+QPushButton#principal:disabled {{ background: rgba(212,167,44,0.35); }}
+"""
+
+
+class Centre(QWidget):
+    def __init__(self):
+        super().__init__()
+        self.setWindowTitle("Mises à jour")
+        self.setWindowIcon(QIcon.fromTheme("system-software-update"))
+        self.setStyleSheet(STYLE)
+        self.resize(820, 680)
+        self.proc = None
+
+        banniere = QWidget()
+        banniere.setObjectName("banniere")
+        bh = QHBoxLayout(banniere)
+        bh.setContentsMargins(26, 20, 26, 20)
+        self.icone = QLabel()
+        bv = QVBoxLayout()
+        self.etat = QLabel()
+        self.etat.setObjectName("etat")
+        f = QFont(self.etat.font())
+        f.setPointSizeF(f.pointSizeF() * 1.7)
+        f.setBold(True)
+        self.etat.setFont(f)
+        self.detail = QLabel()
+        bv.addWidget(self.etat)
+        bv.addWidget(self.detail)
+        self.chercher = QPushButton(QIcon.fromTheme("view-refresh"), "Rechercher des mises à jour")
+        self.chercher.clicked.connect(lambda: self.lancer("rechercher"))
+        self.installer = QPushButton(QIcon.fromTheme("run-install"), "Installer maintenant")
+        self.installer.setObjectName("principal")
+        self.installer.clicked.connect(lambda: self.lancer("installer-maj"))
+        bh.addWidget(self.icone)
+        bh.addSpacing(12)
+        bh.addLayout(bv, 1)
+        bh.addWidget(self.chercher)
+        bh.addWidget(self.installer)
+
+        self.redemarrer = QLabel("<b>Redémarrez l'ordinateur</b> pour terminer l'installation des mises à jour.")
+        self.redemarrer.setStyleSheet(f"background: rgba(212,167,44,0.18); border: 1px solid {OR}; "
+                                      "border-radius: 8px; padding: 10px;")
+        self.barre = QProgressBar()
+        self.barre.setRange(0, 0)
+        self.barre.setMaximumHeight(8)
+        self.barre.setTextVisible(False)
+        self.barre.setVisible(False)
+        self.journal = QLabel("")
+        self.journal.setWordWrap(True)
+
+        def carte(titre, contenu):
+            fr = QFrame()
+            fr.setObjectName("carte")
+            v = QVBoxLayout(fr)
+            v.setContentsMargins(16, 12, 16, 12)
+            t = QLabel(titre)
+            t.setObjectName("titre")
+            v.addWidget(t)
+            v.addWidget(contenu)
+            return fr
+
+        self.liste = QListWidget()
+        self.liste.setFrameShape(QFrame.Shape.NoFrame)
+        self.hist = QListWidget()
+        self.hist.setFrameShape(QFrame.Shape.NoFrame)
+        self.auto = QLabel()
+        self.auto.setWordWrap(True)
+
+        corps = QVBoxLayout()
+        corps.setContentsMargins(22, 16, 22, 18)
+        corps.setSpacing(12)
+        corps.addWidget(self.redemarrer)
+        corps.addWidget(self.barre)
+        corps.addWidget(self.journal)
+        corps.addWidget(carte("Disponibles", self.liste), 2)
+        corps.addWidget(carte("Historique des mises à jour", self.hist), 2)
+        corps.addWidget(self.auto)
+
+        lay = QVBoxLayout(self)
+        lay.setContentsMargins(0, 0, 0, 0)
+        lay.addWidget(banniere)
+        lay.addLayout(corps, 1)
+        self.actualiser()
+
+    def actualiser(self):
+        attente = en_attente()
+        n = len(attente)
+        self.icone.setPixmap(QIcon.fromTheme("security-high" if not n else "system-software-update").pixmap(64, 64))
+        self.etat.setText("Votre ordinateur est à jour" if not n else
+                          f"{n} mise{'s' if n > 1 else ''} à jour disponible{'s' if n > 1 else ''}")
+        self.detail.setText(f"Dernière vérification : {quand(derniere_verification())}")
+        self.installer.setVisible(bool(n))
+        self.liste.clear()
+        for p, v in attente:
+            self.liste.addItem(f"{nom_lisible(p)}  —  version {v}")
+        if not n:
+            self.liste.addItem("Rien à installer.")
+        self.hist.clear()
+        for date, paquets in historique():
+            noms = sorted({nom_lisible(p) for p in paquets})
+            plus = f" et {len(noms) - 4} autres" if len(noms) > 4 else ""
+            self.hist.addItem(f"{date}  —  {', '.join(noms[:4])}{plus}")
+        if not self.hist.count():
+            self.hist.addItem("Aucune mise à jour installée pour l'instant.")
+        self.redemarrer.setVisible(redemarrage_necessaire())
+        self.auto.setText("✓ Les correctifs de sécurité s'installent automatiquement chaque jour." if automatique()
+                          else "⚠ Les correctifs de sécurité ne s'installent pas automatiquement : "
+                               "activez-les dans le Centre de protection.")
+
+    def lancer(self, action):
+        if self.proc:
+            return
+        self.chercher.setEnabled(False)
+        self.installer.setEnabled(False)
+        self.barre.setVisible(True)
+        self.journal.setText("Recherche en cours…" if action == "rechercher" else
+                             "Installation en cours… Vous pouvez continuer à utiliser l'ordinateur.")
+        self.proc = QProcess(self)
+        self.proc.setProcessChannelMode(QProcess.ProcessChannelMode.MergedChannels)
+        self.proc.readyReadStandardOutput.connect(self.lire)
+        self.proc.finished.connect(lambda code, _s: self.fini(action, code))
+        self.proc.start("pkexec", [ROOT_HELPER, action])
+
+    def lire(self):
+        lignes = bytes(self.proc.readAllStandardOutput()).decode("utf-8", "replace").strip().splitlines()
+        if lignes:
+            derniere = lignes[-1]
+            m = re.match(r"^(?:Setting up|Paramétrage de) (\S+)", derniere)
+            self.journal.setText(f"Installation de {nom_lisible(m.group(1).split(':')[0])}…" if m else derniere[:120])
+
+    def fini(self, action, code):
+        self.proc = None
+        self.barre.setVisible(False)
+        self.chercher.setEnabled(True)
+        self.installer.setEnabled(True)
+        self.journal.setText("" if code == 0 else "Annulé." if code in (126, 127) else
+                             "La mise à jour n'a pas abouti (connexion à Internet ?).")
+        if code == 0 and action == "installer-maj":
+            self.journal.setText("Mises à jour installées.")
+        self.actualiser()
+
+
+def main():
+    app = QApplication(sys.argv)
+    app.setApplicationName("Mises à jour")
+    app.setDesktopFileName("protectos-mises-a-jour")
+    w = Centre()
+    w.show()
+    return app.exec()
+
+
+if __name__ == "__main__":
+    sys.exit(main())

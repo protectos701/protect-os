@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Mises à jour
+Comment=Garder protect.OS à jour : état, installation et historique
+Exec=protectos-mises-a-jour
+Icon=system-software-update
+Terminal=false
+Categories=Qt;System;Settings;
+Keywords=mise à jour;update;sécurité;correctifs;

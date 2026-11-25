@@ -3,10 +3,10 @@
 # N'accepte que des actions prévues à l'avance.
 set -e
 export DEBIAN_FRONTEND=noninteractive
-[ "$#" -gt 0 ] || { echo "Usage : $0 pare-feu | mises-a-jour | sauvegardes | antivirus | vie-privee ..." >&2; exit 2; }
+[ "$#" -gt 0 ] || { echo "Usage : $0 pare-feu | mises-a-jour | sauvegardes | antivirus | vie-privee | rechercher | installer-maj ..." >&2; exit 2; }
 for a in "$@"; do
 	case "$a" in
-		pare-feu|mises-a-jour|sauvegardes|antivirus|vie-privee) ;;
+		pare-feu|mises-a-jour|sauvegardes|antivirus|vie-privee|rechercher|installer-maj) ;;
 		*) echo "Action inconnue : $a" >&2; exit 2 ;;
 	esac
 done
@@ -39,6 +39,18 @@ for a in "$@"; do
 			;;
 		vie-privee)
 			/usr/lib/protectos/protectos-bloqueur activer
+			;;
+		rechercher)
+			# Centre de mises à jour : recherche des nouvelles versions
+			apt-get update
+			mkdir -p /var/lib/protectos && touch /var/lib/protectos/derniere-recherche
+			;;
+		installer-maj)
+			# Centre de mises à jour : installe tout, sans question (les réglages existants sont gardés)
+			apt-get update
+			DEBIAN_FRONTEND=noninteractive apt-get -y -o Dpkg::Options::=--force-confdef \
+				-o Dpkg::Options::=--force-confold full-upgrade
+			mkdir -p /var/lib/protectos && touch /var/lib/protectos/derniere-recherche
 			;;
 		antivirus)
 			installer clamav clamav-freshclam inotify-tools

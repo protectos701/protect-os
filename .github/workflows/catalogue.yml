@@ -1,0 +1,35 @@
+# Met à jour chaque semaine le catalogue des programmes Windows du Magasin (depuis le catalogue winget).
+name: Catalogue Windows
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 4 * * 1"
+  push:
+    branches: [main]
+    paths:
+      - "tools/catalogue-liste.json"
+      - "tools/catalogue-windows.py"
+
+permissions:
+  contents: write
+
+jobs:
+  catalogue:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Construire le catalogue
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          python3 -c "import yaml" 2>/dev/null || pip install pyyaml
+          python3 tools/catalogue-windows.py
+      - name: Enregistrer s'il a changé
+        run: |
+          git config user.name "protect.OS (catalogue)"
+          git config user.email "protectos701@users.noreply.github.com"
+          git add apps/catalogue-windows.json packages/protectos-programmes/root/usr/share/protectos/catalogue-windows.json
+          if git diff --cached --quiet; then echo "Catalogue inchangé"; exit 0; fi
+          git commit -m "Catalogue Windows mis à jour"
+          git push

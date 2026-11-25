@@ -76,10 +76,22 @@ def main():
         subprocess.run(["xdg-user-dirs-update"], capture_output=True, timeout=10)
     except (OSError, subprocess.TimeoutExpired):
         pass
-    if not os.path.exists(PLACES) or "--forcer" in sys.argv:
-        os.makedirs(os.path.dirname(PLACES), exist_ok=True)
-        with open(PLACES, "w", encoding="utf-8") as f:
-            f.write(emplacements_xbel())
+    # Plasma crée ses emplacements par défaut dès l'ouverture de session : à la première session,
+    # on les remplace par ceux de protect.OS (l'ancien fichier est gardé à côté).
+    os.makedirs(os.path.dirname(PLACES), exist_ok=True)
+    if os.path.exists(PLACES):
+        os.replace(PLACES, PLACES + ".avant-protectos")
+    with open(PLACES, "w", encoding="utf-8") as f:
+        f.write(emplacements_xbel())
+    # Pas de dossiers « Modèles » ni « Public » (ils n'existent pas sous Windows) s'ils sont vides
+    for cle in ("TEMPLATES", "PUBLICSHARE"):
+        d = dossier_xdg(cle)
+        try:
+            if d and os.path.isdir(d) and not os.listdir(d):
+                os.rmdir(d)
+                subprocess.run(["xdg-user-dirs-update", "--set", cle, os.path.expanduser("~")], capture_output=True)
+        except OSError:
+            pass
     os.makedirs(os.path.dirname(MARQUE), exist_ok=True)
     open(MARQUE, "w").close()
     return 0

@@ -10,6 +10,9 @@ import urllib.request
 
 CATALOGUE_EN_LIGNE = "https://raw.githubusercontent.com/protectos701/protect-os/main/apps/catalogue-windows.json"
 CATALOGUE_LOCAL = "/usr/share/protectos/catalogue-windows.json"
+ICONES_EN_LIGNE = "https://raw.githubusercontent.com/protectos701/protect-os/main/apps/icones/"
+ICONES_LOCALES = "/usr/share/protectos/icones-windows"
+sys.path.insert(0, "/usr/lib/protectos")
 CACHE = os.path.expanduser("~/.cache/protectos/magasin")
 OR = "#d4a72c"
 
@@ -34,7 +37,9 @@ def charger_catalogue():
             os.makedirs(CACHE, exist_ok=True)
             with open(os.path.join(CACHE, "catalogue.json"), "w", encoding="utf-8") as f:
                 json.dump(data, f)
-            return data.get("programmes", []), "à jour"
+            progs = data.get("programmes", [])
+            telecharger_icones(progs)
+            return progs, "à jour"
     except Exception:
         for chemin in (os.path.join(CACHE, "catalogue.json"), CATALOGUE_LOCAL):
             try:
@@ -42,6 +47,47 @@ def charger_catalogue():
             except (OSError, ValueError):
                 continue
     return [], "indisponible"
+
+
+def chemin_icone(nom):
+    for d in (ICONES_LOCALES, os.path.join(CACHE, "icones")):
+        if nom and os.path.exists(os.path.join(d, nom)):
+            return os.path.join(d, nom)
+    return ""
+
+
+def telecharger_icones(progs):
+    """Icônes des nouveaux programmes du catalogue (les autres sont déjà fournies avec protect.OS)."""
+    os.makedirs(os.path.join(CACHE, "icones"), exist_ok=True)
+    for p in progs:
+        nom = p.get("icone", "")
+        if nom and not chemin_icone(nom) and "/" not in nom:
+            try:
+                with urllib.request.urlopen(ICONES_EN_LIGNE + urllib.request.quote(nom), timeout=4) as r:
+                    open(os.path.join(CACHE, "icones", nom), "wb").write(r.read())
+            except Exception:
+                pass
+
+
+def programmes_windows_installes():
+    """Programmes Windows installés (registre de la couche Windows), pour afficher « Installé »."""
+    try:
+        import protectos_programmes as pp
+        return pp.windows_programs()
+    except Exception:
+        return []
+
+
+def simple(t):
+    return "".join(c for c in t.lower() if c.isalnum())
+
+
+def trouver_installe(prog, installes):
+    cle = simple(prog["nom"])
+    for i in installes:
+        if cle and (simple(i["nom"]).startswith(cle) or cle in simple(i["nom"])):
+            return i
+    return None
 
 
 def est_installe(paquet):
@@ -120,17 +166,24 @@ class Telechargement(QThread):
 
 
 class CarteWindows(QFrame):
-    def __init__(self, prog):
+    def __init__(self, prog, installes=()):
         super().__init__()
         self.prog = prog
+        self.installe = trouver_installe(prog, installes)
         self.setObjectName("carte")
         self.setMinimumHeight(118)
         g = QGridLayout(self)
         g.setContentsMargins(14, 12, 14, 12)
-        pastille = QLabel(prog["nom"][:1].upper())
-        pastille.setObjectName("pastille")
-        pastille.setFixedSize(44, 44)
-        pastille.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        icone = chemin_icone(prog.get("icone", ""))
+        if icone:
+            pastille = QLabel()
+            pastille.setFixedSize(44, 44)
+            pastille.setPixmap(QIcon(icone).pixmap(44, 44))
+        else:
+            pastille = QLabel(prog["nom"][:1].upper())
+            pastille.setObjectName("pastille")
+            pastille.setFixedSize(44, 44)
+            pastille.setAlignment(Qt.AlignmentFlag.AlignCenter)
         titre = QLabel(f"<b>{prog['nom']}</b>")
         sous = QLabel(f"{prog.get('editeur', '')} · version {prog['version']}")
         sous.setStyleSheet("color: palette(placeholder-text);")
@@ -139,6 +192,12 @@ class CarteWindows(QFrame):
         self.bouton = QPushButton("Installer")
         self.bouton.setObjectName("installer")
         self.bouton.clicked.connect(self.installer)
+        self.retirer = QPushButton("Désinstaller")
+        self.retirer.clicked.connect(self.desinstaller)
+        self.retirer.setVisible(bool(self.installe))
+        if self.installe:
+            self.bouton.setText("Installé")
+            self.bouton.setEnabled(False)
         self.barre = QProgressBar()
         self.barre.setVisible(False)
         self.barre.setMaximumHeight(8)
@@ -147,13 +206,43 @@ class CarteWindows(QFrame):
         self.etat.setWordWrap(True)
         g.addWidget(pastille, 0, 0, 2, 1, Qt.AlignmentFlag.AlignTop)
         g.addWidget(titre, 0, 1)
-        g.addWidget(self.bouton, 0, 2, Qt.AlignmentFlag.AlignRight)
+        boutons = QHBoxLayout()
+        boutons.addWidget(self.retirer)
+        boutons.addWidget(self.bouton)
+        g.addLayout(boutons, 0, 2, Qt.AlignmentFlag.AlignRight)
         g.addWidget(sous, 1, 1, 1, 2)
         g.addWidget(desc, 2, 0, 1, 3)
         g.addWidget(self.barre, 3, 0, 1, 3)
         g.addWidget(self.etat, 4, 0, 1, 3)
         g.setColumnStretch(1, 1)
         self.tache = None
+
+    def desinstaller(self):
+        try:
+            import protectos_programmes as pp
+            cmd = pp.uninstall_windows_command(self.installe["id"])
+            env = pp.wine_env()
+        except Exception as e:
+            self.etat.setText(f"Désinstallation impossible : {e}")
+            return
+        self.retirer.setEnabled(False)
+        self.etat.setText("Désinstallation… suivez les étapes du programme.")
+        self.proc = QProcess(self)
+        from PyQt6.QtCore import QProcessEnvironment
+        pe = QProcessEnvironment.systemEnvironment()
+        for k, v in env.items():
+            pe.insert(k, str(v))
+        self.proc.setProcessEnvironment(pe)
+        self.proc.finished.connect(self.apres_desinstallation)
+        self.proc.start(cmd[0], cmd[1:])
+
+    def apres_desinstallation(self, *_):
+        self.installe = trouver_installe(self.prog, programmes_windows_installes())
+        self.retirer.setVisible(bool(self.installe))
+        self.retirer.setEnabled(True)
+        self.bouton.setText("Installé" if self.installe else "Installer")
+        self.bouton.setEnabled(not self.installe)
+        self.etat.setText("" if self.installe else "Programme désinstallé.")
 
     def installer(self):
         self.bouton.setEnabled(False)
@@ -240,7 +329,8 @@ class Magasin(QWidget):
 
         self.onglets = QTabWidget()
         self.progs, self.etat = charger_catalogue()
-        self.cartes_win = [CarteWindows(p) for p in self.progs]
+        installes = programmes_windows_installes()
+        self.cartes_win = [CarteWindows(p, installes) for p in self.progs]
         self.onglets.addTab(self.page(self.cartes_win, "categorie",
                                       f"Programmes Windows vérifiés : téléchargés depuis le site officiel de l'éditeur, "
                                       f"contrôlés (empreinte SHA-256) puis analysés par l'antivirus. Catalogue {self.etat}."),

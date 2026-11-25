@@ -80,6 +80,36 @@
       "id": "Valve.Steam",
       "categorie": "Jeux",
       "description": "La boutique de jeux (version Windows). Les jeux Windows passent par la compatibilité Windows."
+    },
+    {
+      "id": "FlorianHeidenreich.Mp3tag",
+      "categorie": "Musique et vidéo",
+      "description": "Renommer et compléter les infos de vos musiques (titre, pochette…)."
+    },
+    {
+      "id": "Spotify.Spotify",
+      "categorie": "Musique et vidéo",
+      "description": "Écouter de la musique en streaming."
+    },
+    {
+      "id": "MediaArea.MediaInfo.GUI",
+      "categorie": "Musique et vidéo",
+      "description": "Tout savoir sur un fichier vidéo ou audio."
+    },
+    {
+      "id": "FastStone.Viewer",
+      "categorie": "Photo et image",
+      "description": "Visionneuse et retouche rapide de photos."
+    },
+    {
+      "id": "MHNexus.HxD",
+      "categorie": "Utilitaires",
+      "description": "Éditeur hexadécimal pour fichiers et disques."
+    },
+    {
+      "id": "Discord.Discord",
+      "categorie": "Internet",
+      "description": "Discuter par écrit et par la voix avec vos amis et communautés."
     }
   ]
 }

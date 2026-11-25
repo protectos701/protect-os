@@ -23,13 +23,13 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          python3 -c "import yaml" 2>/dev/null || pip install pyyaml
+          pip install pyyaml pillow
           python3 tools/catalogue-windows.py
       - name: Enregistrer s'il a changé
         run: |
           git config user.name "protect.OS (catalogue)"
           git config user.email "protectos701@users.noreply.github.com"
-          git add apps/catalogue-windows.json packages/protectos-programmes/root/usr/share/protectos/catalogue-windows.json
+          git add apps/catalogue-windows.json apps/icones packages/protectos-programmes/root/usr/share/protectos/
           if git diff --cached --quiet; then echo "Catalogue inchangé"; exit 0; fi
           git commit -m "Catalogue Windows mis à jour"
           git push

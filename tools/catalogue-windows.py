@@ -57,6 +57,58 @@ def choisir_installateur(doc):
             "silencieux": (i.get("InstallerSwitches") or {}).get("Silent", "")}
 
 
+def icone(ident, sites):
+    """Icône officielle : celle déclarée par le site de l'éditeur (la plus grande), sinon son favicon.
+    Enregistrée en PNG 96×96 dans apps/icones/ (et dans le paquet, pour l'usage hors ligne)."""
+    import html.parser
+    import io
+    from PIL import Image
+
+    class Liens(html.parser.HTMLParser):
+        def __init__(self):
+            super().__init__()
+            self.icones = []
+
+        def handle_starttag(self, tag, attrs):
+            a = dict(attrs)
+            if tag == "link" and "icon" in (a.get("rel") or "").lower() and a.get("href"):
+                taille = max([int(x) for x in re.findall(r"(\d+)x\d+", a.get("sizes") or "")] or [0])
+                bonus = 1000 if "apple-touch" in a["rel"].lower() else 0
+                self.icones.append((taille + bonus, a["href"]))
+
+    candidats = []
+    for site in [s for s in sites if s]:
+        try:
+            p = Liens()
+            p.feed(obtenir(site, api=False).decode("utf-8", "replace")[:400000])
+            candidats += [urllib.parse.urljoin(site, h) for _t, h in sorted(p.icones, reverse=True)]
+        except Exception:
+            pass
+        racine = "{0.scheme}://{0.netloc}".format(urllib.parse.urlsplit(site))
+        candidats += [racine + "/apple-touch-icon.png", racine + "/favicon.ico"]
+    for url in candidats:
+        if url.lower().endswith(".svg"):
+            continue
+        try:
+            im = Image.open(io.BytesIO(obtenir(url, api=False)))
+            if im.format == "ICO":  # un .ico contient plusieurs tailles : on prend la plus grande
+                im = im.ico.getimage(max(im.ico.sizes()))
+            im = im.convert("RGBA")
+            if im.width < 16:
+                continue
+            im.thumbnail((96, 96), Image.LANCZOS)
+            fond = Image.new("RGBA", (96, 96), (0, 0, 0, 0))
+            fond.paste(im, ((96 - im.width) // 2, (96 - im.height) // 2), im)
+            nom = re.sub(r"[^A-Za-z0-9.+-]", "_", ident) + ".png"
+            for dossier in ("apps/icones", "packages/protectos-programmes/root/usr/share/protectos/icones-windows"):
+                os.makedirs(os.path.join(ROOT, dossier), exist_ok=True)
+                fond.save(os.path.join(ROOT, dossier, nom))
+            return nom
+        except Exception:
+            continue
+    return ""
+
+
 def programme(entree):
     ident = entree["id"]
     chemin = "manifests/" + ident[0].lower() + "/" + "/".join(ident.split("."))
@@ -75,7 +127,9 @@ def programme(entree):
     choix = choisir_installateur(inst)
     if not choix:
         raise ValueError("aucun installateur compatible (seulement msix/zip ?)")
+    ic = icone(ident, [loc.get("PackageUrl"), loc.get("PublisherUrl")])
     return {"id": ident, "nom": loc.get("PackageName", ident.split(".")[-1]), "editeur": loc.get("Publisher", ""),
+            "icone": ic,
             "version": str(version), "categorie": entree["categorie"],
             "description": entree.get("description") or loc.get("ShortDescription", ""),
             "licence": loc.get("License", ""), "site": loc.get("PackageUrl") or loc.get("PublisherUrl", ""),
@@ -89,7 +143,7 @@ def main():
         try:
             p = programme(e)
             sortie.append(p)
-            print(f"  ✓ {p['nom']} {p['version']} ({p['type']}, {p['architecture']})")
+            print(f"  ✓ {p['nom']} {p['version']} ({p['type']}, {p['architecture']}) icône : {p['icone'] or 'aucune'}")
         except Exception as ex:
             erreurs += 1
             print(f"  ✗ {e['id']} : {ex}")

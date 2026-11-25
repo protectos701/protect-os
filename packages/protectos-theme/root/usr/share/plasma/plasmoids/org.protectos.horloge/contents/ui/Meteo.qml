@@ -101,32 +101,42 @@ Item {
     component Nuage: Item {
         id: n
         property real taille: 1
-        property real vitesse: 30000
+        property real ancre: 0.2         // position horizontale finale (fraction de la largeur)
         property real hauteur: 0.2
+        property real derive: 0.05       // amplitude du flottement
+        property int periode: 9000
         property bool visibleNuage: true
         property real largeurScene: 300
         property real hauteurScene: 160
         property color teinte: "#ffffff"
         width: largeurScene * 0.42 * taille; height: width * 0.5
         y: hauteurScene * hauteur
+        // Quand le ciel se couvre, le nuage arrive de la droite jusqu'à sa place (devant le soleil) ;
+        // quand il se dégage, il repart vers la droite.
+        x: visibleNuage ? largeurScene * ancre : largeurScene + 20
         opacity: visibleNuage ? 1 : 0
-        Behavior on opacity { NumberAnimation { duration: 2500 } }
-        property real deplacement: largeurScene
-        x: deplacement
-        NumberAnimation on deplacement {
-            from: n.largeurScene + 10; to: -n.width - 10
-            duration: n.vitesse; loops: Animation.Infinite; running: true
+        Behavior on x { NumberAnimation { duration: 4500; easing.type: Easing.InOutQuad } }
+        Behavior on opacity { NumberAnimation { duration: 3000 } }
+        Item {
+            id: forme
+            width: n.width; height: n.height
+            SequentialAnimation on x {   // flottement doux
+                loops: Animation.Infinite
+                NumberAnimation { from: 0; to: n.largeurScene * n.derive; duration: n.periode; easing.type: Easing.InOutSine }
+                NumberAnimation { from: n.largeurScene * n.derive; to: 0; duration: n.periode; easing.type: Easing.InOutSine }
+            }
+            Rectangle { x: n.width * 0.05; y: n.height * 0.45; width: n.width * 0.9; height: n.height * 0.5; radius: height / 2; color: n.teinte }
+            Rectangle { x: n.width * 0.18; y: n.height * 0.18; width: n.width * 0.38; height: width; radius: width / 2; color: n.teinte }
+            Rectangle { x: n.width * 0.42; y: n.height * 0.02; width: n.width * 0.44; height: width; radius: width / 2; color: n.teinte }
         }
-        Rectangle { x: n.width * 0.05; y: n.height * 0.45; width: n.width * 0.9; height: n.height * 0.5; radius: height / 2; color: n.teinte }
-        Rectangle { x: n.width * 0.18; y: n.height * 0.18; width: n.width * 0.38; height: width; radius: width / 2; color: n.teinte }
-        Rectangle { x: n.width * 0.42; y: n.height * 0.02; width: n.width * 0.44; height: width; radius: width / 2; color: n.teinte }
     }
     readonly property color teinteNuage: sombre ? "#8b95aa" : jour ? "#ffffff" : "#56628a"
 
-    Nuage { taille: 1.15; vitesse: 26000; hauteur: 0.16; visibleNuage: scene.couverture > 0.3; largeurScene: scene.width; hauteurScene: scene.height; teinte: scene.teinteNuage }
-    Nuage { taille: 0.85; vitesse: 34000; hauteur: 0.36; visibleNuage: scene.couverture > 0.6; largeurScene: scene.width; hauteurScene: scene.height; teinte: scene.teinteNuage }
-    Nuage { taille: 1.3; vitesse: 21000; hauteur: 0.02; visibleNuage: scene.couverture > 0.8; largeurScene: scene.width; hauteurScene: scene.height; teinte: scene.teinteNuage }
-    Nuage { taille: 0.7; vitesse: 40000; hauteur: 0.48; visibleNuage: scene.couverture > 0.9; largeurScene: scene.width; hauteurScene: scene.height; teinte: scene.teinteNuage }
+    // Le premier nuage s'arrête devant le soleil ; les suivants couvrent le reste du ciel
+    Nuage { taille: 1.0; ancre: 0.10; hauteur: 0.20; periode: 9000; visibleNuage: scene.couverture > 0.3; largeurScene: scene.width; hauteurScene: scene.height; teinte: scene.teinteNuage }
+    Nuage { taille: 0.8; ancre: 0.55; hauteur: 0.40; periode: 11000; visibleNuage: scene.couverture > 0.6; largeurScene: scene.width; hauteurScene: scene.height; teinte: scene.teinteNuage }
+    Nuage { taille: 1.2; ancre: 0.38; hauteur: 0.02; periode: 13000; visibleNuage: scene.couverture > 0.8; largeurScene: scene.width; hauteurScene: scene.height; teinte: scene.teinteNuage }
+    Nuage { taille: 0.7; ancre: 0.02; hauteur: 0.52; periode: 10000; visibleNuage: scene.couverture > 0.9; largeurScene: scene.width; hauteurScene: scene.height; teinte: scene.teinteNuage }
 
     // ---------- Brouillard
     Repeater {

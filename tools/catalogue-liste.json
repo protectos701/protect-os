@@ -1,22 +1,85 @@
 {
   "commentaire": "Programmes Windows proposés dans le Magasin protect.OS. Identifiants du catalogue winget (github.com/microsoft/winget-pkgs). Le catalogue est mis à jour chaque semaine par .github/workflows/catalogue.yml.",
   "programmes": [
-    {"id": "Notepad++.Notepad++", "categorie": "Bureautique", "description": "Éditeur de texte et de code, léger et très complet."},
-    {"id": "TrackerSoftware.PDF-XChangeEditor", "categorie": "Bureautique", "description": "Lire, annoter et remplir des PDF."},
-    {"id": "SumatraPDF.SumatraPDF", "categorie": "Bureautique", "description": "Lecteur PDF, EPUB et BD ultra-rapide."},
-    {"id": "WinMerge.WinMerge", "categorie": "Bureautique", "description": "Comparer deux fichiers ou deux dossiers."},
-    {"id": "7zip.7zip", "categorie": "Utilitaires", "description": "Compresser et ouvrir les archives (7z, zip, rar…)."},
-    {"id": "Giorgiotani.Peazip", "categorie": "Utilitaires", "description": "Gestionnaire d'archives simple et complet."},
-    {"id": "RARLab.WinRAR", "categorie": "Utilitaires", "description": "Le célèbre compresseur RAR et ZIP."},
-    {"id": "CPUID.CPU-Z", "categorie": "Utilitaires", "description": "Caractéristiques du processeur et de la mémoire."},
-    {"id": "IrfanSkiljan.IrfanView", "categorie": "Photo et image", "description": "Visionneuse d'images rapide avec retouches simples."},
-    {"id": "XnSoft.XnViewMP", "categorie": "Photo et image", "description": "Visionneuse, classement et conversion d'images."},
-    {"id": "Greenshot.Greenshot", "categorie": "Photo et image", "description": "Captures d'écran annotées."},
-    {"id": "PeterPawlowski.foobar2000", "categorie": "Musique et vidéo", "description": "Lecteur audio de référence, léger et personnalisable."},
-    {"id": "AIMP.AIMP", "categorie": "Musique et vidéo", "description": "Lecteur de musique avec égaliseur et radios."},
-    {"id": "MusicBee.MusicBee", "categorie": "Musique et vidéo", "description": "Organiser et écouter sa bibliothèque musicale."},
-    {"id": "WinSCP.WinSCP", "categorie": "Internet", "description": "Transférer des fichiers vers un serveur (SFTP, FTP)."},
-    {"id": "PuTTY.PuTTY", "categorie": "Internet", "description": "Connexion à distance SSH et Telnet."},
-    {"id": "Valve.Steam", "categorie": "Jeux", "description": "La boutique de jeux (version Windows). Les jeux Windows passent par la compatibilité Windows."}
+    {
+      "id": "Notepad++.Notepad++",
+      "categorie": "Bureautique",
+      "description": "Éditeur de texte et de code, léger et très complet."
+    },
+    {
+      "id": "TrackerSoftware.PDF-XChangeEditor",
+      "categorie": "Bureautique",
+      "description": "Lire, annoter et remplir des PDF."
+    },
+    {
+      "id": "SumatraPDF.SumatraPDF",
+      "categorie": "Bureautique",
+      "description": "Lecteur PDF, EPUB et BD ultra-rapide."
+    },
+    {
+      "id": "WinMerge.WinMerge",
+      "categorie": "Bureautique",
+      "description": "Comparer deux fichiers ou deux dossiers."
+    },
+    {
+      "id": "7zip.7zip",
+      "categorie": "Utilitaires",
+      "description": "Compresser et ouvrir les archives (7z, zip, rar…)."
+    },
+    {
+      "id": "Giorgiotani.Peazip",
+      "categorie": "Utilitaires",
+      "description": "Gestionnaire d'archives simple et complet."
+    },
+    {
+      "id": "RARLab.WinRAR",
+      "categorie": "Utilitaires",
+      "description": "Le célèbre compresseur RAR et ZIP."
+    },
+    {
+      "id": "CPUID.CPU-Z",
+      "categorie": "Utilitaires",
+      "description": "Caractéristiques du processeur et de la mémoire."
+    },
+    {
+      "id": "IrfanSkiljan.IrfanView",
+      "categorie": "Photo et image",
+      "description": "Visionneuse d'images rapide avec retouches simples."
+    },
+    {
+      "id": "XnSoft.XnViewMP",
+      "categorie": "Photo et image",
+      "description": "Visionneuse, classement et conversion d'images."
+    },
+    {
+      "id": "Greenshot.Greenshot",
+      "categorie": "Photo et image",
+      "description": "Captures d'écran annotées."
+    },
+    {
+      "id": "PeterPawlowski.foobar2000",
+      "categorie": "Musique et vidéo",
+      "description": "Lecteur audio de référence, léger et personnalisable."
+    },
+    {
+      "id": "AIMP.AIMP",
+      "categorie": "Musique et vidéo",
+      "description": "Lecteur de musique avec égaliseur et radios."
+    },
+    {
+      "id": "WinSCP.WinSCP",
+      "categorie": "Internet",
+      "description": "Transférer des fichiers vers un serveur (SFTP, FTP)."
+    },
+    {
+      "id": "PuTTY.PuTTY",
+      "categorie": "Internet",
+      "description": "Connexion à distance SSH et Telnet."
+    },
+    {
+      "id": "Valve.Steam",
+      "categorie": "Jeux",
+      "description": "La boutique de jeux (version Windows). Les jeux Windows passent par la compatibilité Windows."
+    }
   ]
 }

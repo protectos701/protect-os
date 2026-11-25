@@ -1,0 +1,309 @@
+#!/usr/bin/python3
+"""Magasin protect.OS : programmes Windows (catalogue vérifié) et applications protect.OS, au même endroit."""
+import hashlib
+import json
+import os
+import shutil
+import subprocess
+import sys
+import urllib.request
+
+CATALOGUE_EN_LIGNE = "https://raw.githubusercontent.com/protectos701/protect-os/main/apps/catalogue-windows.json"
+CATALOGUE_LOCAL = "/usr/share/protectos/catalogue-windows.json"
+CACHE = os.path.expanduser("~/.cache/protectos/magasin")
+OR = "#d4a72c"
+
+# Applications protect.OS (paquets autorisés par l'assistant administrateur)
+APPLICATIONS = [
+    ("Retouche photo", "gimp", "Retoucher et créer des images, comme Photoshop.", "gimp"),
+    ("Dessin numérique", "krita", "Peinture et illustration.", "krita"),
+    ("Dessin vectoriel", "inkscape", "Logos, affiches, illustrations vectorielles.", "inkscape"),
+    ("Montage vidéo", "kdenlive", "Monter ses vidéos simplement.", "kdenlive"),
+    ("Enregistrement d'écran", "obs-studio", "Filmer l'écran, diffuser en direct.", "com.obsproject.Studio"),
+    ("Enregistrement audio", "audacity", "Enregistrer et retoucher des sons.", "audacity"),
+    ("Courrier électronique", "thunderbird", "Lire et envoyer ses e-mails.", "thunderbird"),
+    ("Jeux (Steam)", "steam-installer", "La boutique de jeux Steam, avec les jeux Windows compatibles.", "steam"),
+]
+
+
+def charger_catalogue():
+    """Catalogue à jour depuis Internet, sinon la copie fournie avec protect.OS."""
+    try:
+        with urllib.request.urlopen(CATALOGUE_EN_LIGNE, timeout=6) as r:
+            data = json.loads(r.read())
+            os.makedirs(CACHE, exist_ok=True)
+            with open(os.path.join(CACHE, "catalogue.json"), "w", encoding="utf-8") as f:
+                json.dump(data, f)
+            return data.get("programmes", []), "à jour"
+    except Exception:
+        for chemin in (os.path.join(CACHE, "catalogue.json"), CATALOGUE_LOCAL):
+            try:
+                return json.load(open(chemin, encoding="utf-8")).get("programmes", []), "hors ligne"
+            except (OSError, ValueError):
+                continue
+    return [], "indisponible"
+
+
+def est_installe(paquet):
+    r = subprocess.run(["dpkg-query", "-W", "-f=${Status}", paquet], capture_output=True, text=True)
+    return "install ok installed" in r.stdout
+
+
+if "--liste" in sys.argv:
+    progs, etat = charger_catalogue()
+    print(f"Catalogue Windows ({etat}) : {len(progs)} programmes")
+    for p in progs:
+        print(f"  [{p['categorie']}] {p['nom']} {p['version']} — {p['type']}")
+    sys.exit(0)
+
+from PyQt6.QtCore import QProcess, QSize, Qt, QThread, pyqtSignal  # noqa: E402
+from PyQt6.QtGui import QFont, QIcon  # noqa: E402
+from PyQt6.QtWidgets import (QApplication, QFrame, QGridLayout, QHBoxLayout, QLabel, QLineEdit,  # noqa: E402
+                             QProgressBar, QPushButton, QScrollArea, QTabWidget, QVBoxLayout, QWidget)
+
+STYLE = f"""
+#banniere {{ background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #16307a, stop:1 #060f2e);
+            border-bottom: 2px solid {OR}; }}
+#banniere QLabel {{ color: #eef2fb; }}
+#recherche {{ border: 1px solid rgba(212,167,44,0.55); border-radius: 18px; padding: 7px 16px;
+             background: rgba(0,0,0,0.25); color: #eef2fb; }}
+QFrame#carte {{ border: 1px solid rgba(212,167,44,0.30); border-radius: 12px; background: rgba(255,255,255,0.04); }}
+QFrame#carte:hover {{ border-color: {OR}; }}
+QLabel#pastille {{ background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #2a4fb8, stop:1 #0a1a52);
+                  border: 2px solid {OR}; border-radius: 22px; color: #f3d27a; font-weight: bold; font-size: 18px; }}
+QLabel#categorie {{ color: {OR}; font-weight: bold; }}
+QPushButton#installer {{ background: {OR}; color: #1a1405; border: none; border-radius: 6px; padding: 6px 14px;
+                        font-weight: bold; }}
+QPushButton#installer:disabled {{ background: rgba(212,167,44,0.35); color: #1a1405; }}
+"""
+
+
+class Telechargement(QThread):
+    """Télécharge l'installateur et vérifie son empreinte SHA-256."""
+    progression = pyqtSignal(int)
+    fini = pyqtSignal(str, str)  # chemin, erreur
+
+    def __init__(self, prog):
+        super().__init__()
+        self.prog = prog
+
+    def run(self):
+        p = self.prog
+        os.makedirs(CACHE, exist_ok=True)
+        nom = os.path.basename(p["url"].split("?")[0]) or (p["id"] + ".exe")
+        if not nom.lower().endswith((".exe", ".msi")):
+            nom += ".msi" if p["type"] in ("msi", "wix") else ".exe"
+        chemin = os.path.join(CACHE, nom)
+        try:
+            req = urllib.request.Request(p["url"], headers={"User-Agent": "protect.OS-Magasin"})
+            h = hashlib.sha256()
+            with urllib.request.urlopen(req, timeout=60) as r, open(chemin + ".part", "wb") as f:
+                total = int(r.headers.get("Content-Length") or 0)
+                lu = 0
+                while True:
+                    bloc = r.read(256 * 1024)
+                    if not bloc:
+                        break
+                    f.write(bloc)
+                    h.update(bloc)
+                    lu += len(bloc)
+                    if total:
+                        self.progression.emit(int(lu * 100 / total))
+            if h.hexdigest().lower() != p["sha256"].lower():
+                os.remove(chemin + ".part")
+                self.fini.emit("", "Le fichier téléchargé ne correspond pas à l'original : installation annulée par sécurité.")
+                return
+            os.replace(chemin + ".part", chemin)
+            self.fini.emit(chemin, "")
+        except Exception as e:
+            self.fini.emit("", f"Téléchargement impossible : {e}")
+
+
+class CarteWindows(QFrame):
+    def __init__(self, prog):
+        super().__init__()
+        self.prog = prog
+        self.setObjectName("carte")
+        self.setMinimumHeight(118)
+        g = QGridLayout(self)
+        g.setContentsMargins(14, 12, 14, 12)
+        pastille = QLabel(prog["nom"][:1].upper())
+        pastille.setObjectName("pastille")
+        pastille.setFixedSize(44, 44)
+        pastille.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        titre = QLabel(f"<b>{prog['nom']}</b>")
+        sous = QLabel(f"{prog.get('editeur', '')} · version {prog['version']}")
+        sous.setStyleSheet("color: palette(placeholder-text);")
+        desc = QLabel(prog.get("description", ""))
+        desc.setWordWrap(True)
+        self.bouton = QPushButton("Installer")
+        self.bouton.setObjectName("installer")
+        self.bouton.clicked.connect(self.installer)
+        self.barre = QProgressBar()
+        self.barre.setVisible(False)
+        self.barre.setMaximumHeight(8)
+        self.barre.setTextVisible(False)
+        self.etat = QLabel("")
+        self.etat.setWordWrap(True)
+        g.addWidget(pastille, 0, 0, 2, 1, Qt.AlignmentFlag.AlignTop)
+        g.addWidget(titre, 0, 1)
+        g.addWidget(self.bouton, 0, 2, Qt.AlignmentFlag.AlignRight)
+        g.addWidget(sous, 1, 1, 1, 2)
+        g.addWidget(desc, 2, 0, 1, 3)
+        g.addWidget(self.barre, 3, 0, 1, 3)
+        g.addWidget(self.etat, 4, 0, 1, 3)
+        g.setColumnStretch(1, 1)
+        self.tache = None
+
+    def installer(self):
+        self.bouton.setEnabled(False)
+        self.barre.setVisible(True)
+        self.barre.setValue(0)
+        self.etat.setText("Téléchargement depuis le site officiel…")
+        self.tache = Telechargement(self.prog)
+        self.tache.progression.connect(self.barre.setValue)
+        self.tache.fini.connect(self.telecharge)
+        self.tache.start()
+
+    def telecharge(self, chemin, erreur):
+        self.barre.setVisible(False)
+        if erreur:
+            self.etat.setText(f"<span style='color:#ff8a80'>{erreur}</span>")
+            self.bouton.setEnabled(True)
+            return
+        self.etat.setText("Fichier vérifié. L'installation s'ouvre : analyse antivirus, puis installation.")
+        QProcess.startDetached("protectos-installer", [chemin])
+        self.bouton.setText("Relancer")
+        self.bouton.setEnabled(True)
+
+
+class CarteApplication(QFrame):
+    def __init__(self, nom, paquet, desc, icone):
+        super().__init__()
+        self.setObjectName("carte")
+        self.paquet = paquet
+        g = QGridLayout(self)
+        g.setContentsMargins(14, 12, 14, 12)
+        ic = QLabel()
+        ic.setPixmap(QIcon.fromTheme(icone, QIcon.fromTheme("application-x-executable")).pixmap(44, 44))
+        self.bouton = QPushButton()
+        self.bouton.setObjectName("installer")
+        self.bouton.clicked.connect(self.installer)
+        self.etat = QLabel("")
+        d = QLabel(desc)
+        d.setWordWrap(True)
+        g.addWidget(ic, 0, 0, 2, 1, Qt.AlignmentFlag.AlignTop)
+        g.addWidget(QLabel(f"<b>{nom}</b>"), 0, 1)
+        g.addWidget(self.bouton, 0, 2, Qt.AlignmentFlag.AlignRight)
+        g.addWidget(d, 1, 1, 1, 2)
+        g.addWidget(self.etat, 2, 0, 1, 3)
+        g.setColumnStretch(1, 1)
+        self.maj()
+
+    def maj(self):
+        ok = est_installe(self.paquet)
+        self.bouton.setText("Installée" if ok else "Installer")
+        self.bouton.setEnabled(not ok)
+
+    def installer(self):
+        self.bouton.setEnabled(False)
+        self.etat.setText("Installation… (mot de passe administrateur demandé)")
+        self.proc = QProcess(self)
+        self.proc.finished.connect(lambda code, _s: (self.etat.setText(
+            "Installée : elle est dans le menu Démarrer." if code == 0 else "L'installation n'a pas abouti."), self.maj()))
+        self.proc.start("pkexec", ["/usr/lib/protectos/protectos-bienvenue-root", "applis", self.paquet])
+
+
+class Magasin(QWidget):
+    def __init__(self):
+        super().__init__()
+        self.setWindowTitle("Magasin d'applications")
+        self.setWindowIcon(QIcon.fromTheme("plasmadiscover"))
+        self.setStyleSheet(STYLE)
+        self.resize(1060, 760)
+
+        banniere = QWidget()
+        banniere.setObjectName("banniere")
+        bl = QVBoxLayout(banniere)
+        bl.setContentsMargins(28, 18, 28, 16)
+        titre = QLabel("Magasin d'applications")
+        f = QFont(titre.font())
+        f.setPointSizeF(f.pointSizeF() * 1.8)
+        f.setBold(True)
+        titre.setFont(f)
+        self.recherche = QLineEdit()
+        self.recherche.setObjectName("recherche")
+        self.recherche.setPlaceholderText("Rechercher un programme…")
+        self.recherche.textChanged.connect(self.filtrer)
+        bl.addWidget(titre)
+        bl.addWidget(self.recherche)
+
+        self.onglets = QTabWidget()
+        self.progs, self.etat = charger_catalogue()
+        self.cartes_win = [CarteWindows(p) for p in self.progs]
+        self.onglets.addTab(self.page(self.cartes_win, "categorie",
+                                      f"Programmes Windows vérifiés : téléchargés depuis le site officiel de l'éditeur, "
+                                      f"contrôlés (empreinte SHA-256) puis analysés par l'antivirus. Catalogue {self.etat}."),
+                            QIcon.fromTheme("application-x-ms-dos-executable"), "Programmes Windows")
+        self.cartes_app = [CarteApplication(*a) for a in APPLICATIONS]
+        plus = QPushButton(QIcon.fromTheme("plasmadiscover"), "Ouvrir le magasin complet (plus de 10 000 applications)")
+        plus.clicked.connect(lambda: QProcess.startDetached("plasma-discover", []))
+        self.onglets.addTab(self.page(self.cartes_app, None, "Applications protect.OS : installées et mises à jour "
+                                      "automatiquement, comme le reste du système.", plus),
+                            QIcon.fromTheme("protectos-logo"), "Applications")
+
+        lay = QVBoxLayout(self)
+        lay.setContentsMargins(0, 0, 0, 0)
+        lay.addWidget(banniere)
+        lay.addWidget(self.onglets, 1)
+
+    def page(self, cartes, champ_cat, intro, bas=None):
+        hote = QWidget()
+        v = QVBoxLayout(hote)
+        v.setContentsMargins(24, 16, 24, 20)
+        i = QLabel(intro)
+        i.setWordWrap(True)
+        v.addWidget(i)
+        if not cartes:
+            v.addWidget(QLabel("Le catalogue n'est pas disponible pour le moment (connexion à Internet ?)."))
+        groupes = {}
+        for c in cartes:
+            cat = c.prog["categorie"] if champ_cat else ""
+            groupes.setdefault(cat, []).append(c)
+        for cat, liste in groupes.items():
+            if cat:
+                lab = QLabel(cat)
+                lab.setObjectName("categorie")
+                v.addWidget(lab)
+            g = QGridLayout()
+            g.setSpacing(12)
+            for k, c in enumerate(liste):
+                g.addWidget(c, k // 2, k % 2)
+            v.addLayout(g)
+        if bas:
+            v.addWidget(bas)
+        v.addStretch(1)
+        s = QScrollArea()
+        s.setWidgetResizable(True)
+        s.setFrameShape(QFrame.Shape.NoFrame)
+        s.setWidget(hote)
+        return s
+
+    def filtrer(self, texte):
+        t = texte.lower()
+        for c in self.cartes_win:
+            p = c.prog
+            c.setVisible(not t or t in f"{p['nom']} {p.get('editeur', '')} {p.get('description', '')} {p['categorie']}".lower())
+
+
+def main():
+    app = QApplication(sys.argv)
+    app.setApplicationName("Magasin d'applications")
+    app.setDesktopFileName("org.kde.discover")
+    w = Magasin()
+    w.show()
+    return app.exec()
+
+
+if __name__ == "__main__":
+    sys.exit(main())

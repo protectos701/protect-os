@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Magasin d'applications
+Comment=Programmes Windows vérifiés et applications protect.OS
+Exec=protectos-magasin
+Icon=plasmadiscover
+Terminal=false
+Categories=Qt;System;PackageManager;
+Keywords=magasin;applications;logiciels;programmes;windows;exe;installer;store;
+StartupWMClass=org.kde.discover
+X-ProtectOS-Magasin=true

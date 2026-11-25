@@ -87,7 +87,11 @@ def programmes():
     return charger(f"{PK}/protectos-programmes/root/usr/bin/protectos-programmes", "prg").Programmes()
 
 
-APPLIS = [("parametres", parametres, (1100, 760)), ("a-propos", a_propos, (620, 640)),
+def magasin():
+    return charger(f"{PK}/protectos-programmes/root/usr/bin/protectos-magasin", "mag").Magasin()
+
+
+APPLIS = [("magasin", magasin, (1100, 780)), ("parametres", parametres, (1100, 760)), ("a-propos", a_propos, (620, 640)),
           ("protection", protection, (900, 700)), ("parental", parental, (760, 640)),
           ("bienvenue", bienvenue, (1000, 700)), ("programmes", programmes, (900, 640))]
 

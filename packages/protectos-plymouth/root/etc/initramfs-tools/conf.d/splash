@@ -1,0 +1,3 @@
+# protect.OS : le pilote graphique est chargé dès le début du démarrage,
+# pour que l'écran protect.OS s'affiche sans coupure noire au changement de mode.
+FRAMEBUFFER=y

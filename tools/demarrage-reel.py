@@ -55,7 +55,7 @@ def main():
     try:
         qmp = Qmp(qmp_sock)
         images = []
-        for k in range(26):
+        for k in range(45):
             t = 2 * k
             chemin = os.path.join(sortie, f"t{t:02d}.ppm")
             qmp.cmd("screendump", filename=os.path.abspath(chemin))

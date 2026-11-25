@@ -9,9 +9,9 @@ import sys
 import urllib.request
 
 CATALOGUE_EN_LIGNE = "https://raw.githubusercontent.com/protectos701/protect-os/main/apps/catalogue-windows.json"
-CATALOGUE_LOCAL = "/usr/share/protectos/catalogue-windows.json"
+CATALOGUE_LOCAL = os.environ.get("PROTECTOS_CATALOGUE", "/usr/share/protectos/catalogue-windows.json")
 ICONES_EN_LIGNE = "https://raw.githubusercontent.com/protectos701/protect-os/main/apps/icones/"
-ICONES_LOCALES = "/usr/share/protectos/icones-windows"
+ICONES_LOCALES = os.environ.get("PROTECTOS_ICONES", "/usr/share/protectos/icones-windows")
 sys.path.insert(0, "/usr/lib/protectos")
 CACHE = os.path.expanduser("~/.cache/protectos/magasin")
 OR = "#d4a72c"
@@ -32,6 +32,8 @@ APPLICATIONS = [
 def charger_catalogue():
     """Catalogue à jour depuis Internet, sinon la copie fournie avec protect.OS."""
     try:
+        if os.environ.get("PROTECTOS_HORS_LIGNE"):
+            raise OSError("hors ligne")
         with urllib.request.urlopen(CATALOGUE_EN_LIGNE, timeout=6) as r:
             data = json.loads(r.read())
             os.makedirs(CACHE, exist_ok=True)

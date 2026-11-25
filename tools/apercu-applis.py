@@ -88,6 +88,9 @@ def programmes():
 
 
 def magasin():
+    os.environ["PROTECTOS_HORS_LIGNE"] = "1"   # le catalogue et les icônes du dépôt, sans cache réseau
+    os.environ["PROTECTOS_CATALOGUE"] = f"{PK}/protectos-programmes/root/usr/share/protectos/catalogue-windows.json"
+    os.environ["PROTECTOS_ICONES"] = f"{PK}/protectos-programmes/root/usr/share/protectos/icones-windows"
     return charger(f"{PK}/protectos-programmes/root/usr/bin/protectos-magasin", "mag").Magasin()
 
 

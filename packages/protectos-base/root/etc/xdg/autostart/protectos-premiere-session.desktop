@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=protect.OS : première session
+Exec=/usr/bin/protectos-premiere-session
+NoDisplay=true
+OnlyShowIn=KDE;
+X-KDE-autostart-phase=0

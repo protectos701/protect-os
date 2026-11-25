@@ -1,0 +1,89 @@
+#!/usr/bin/python3
+"""Réglages faits une seule fois, à la première ouverture de session de chaque compte.
+
+- Explorateur de fichiers façon Windows : volet de gauche limité à « Accès rapide » (dossier perso, Bureau,
+  Documents, Téléchargements, Images, Musique, Vidéos, Corbeille) et aux disques ; sans « Distant »,
+  « Récemment enregistrés », « Rechercher » ni « Étiquettes ».
+"""
+import os
+import subprocess
+import sys
+from xml.sax.saxutils import escape
+
+MARQUE = os.path.expanduser("~/.local/share/protectos/premiere-session-faite")
+PLACES = os.path.expanduser("~/.local/share/user-places.xbel")
+
+EMPLACEMENTS = [  # (dossier XDG, nom affiché, icône)
+    ("", "Dossier personnel", "user-home"),
+    ("DESKTOP", "Bureau", "user-desktop"),
+    ("DOCUMENTS", "Documents", "folder-documents"),
+    ("DOWNLOAD", "Téléchargements", "folder-download"),
+    ("PICTURES", "Images", "folder-pictures"),
+    ("MUSIC", "Musique", "folder-music"),
+    ("VIDEOS", "Vidéos", "folder-videos"),
+]
+GROUPES_CACHES = ("Remote", "RecentlySaved", "SearchFor", "Tags")
+
+
+def dossier_xdg(nom):
+    if not nom:
+        return os.path.expanduser("~")
+    try:
+        r = subprocess.run(["xdg-user-dir", nom], capture_output=True, text=True, timeout=3)
+        chemin = r.stdout.strip()
+        if chemin and chemin != os.path.expanduser("~"):
+            return chemin
+    except (OSError, subprocess.TimeoutExpired):
+        pass
+    return ""
+
+
+def uri(chemin):
+    from urllib.parse import quote
+    return "file://" + quote(chemin)
+
+
+def emplacements_xbel():
+    lignes = ['<?xml version="1.0" encoding="UTF-8"?>', "<!DOCTYPE xbel>",
+              '<xbel xmlns:bookmark="http://www.freedesktop.org/standards/desktop-bookmarks" '
+              'xmlns:mime="http://www.freedesktop.org/standards/shared-mime-info" '
+              'xmlns:kdepriv="http://www.kde.org/kdepriv">',
+              " <info>", '  <metadata owner="http://www.kde.org">', "   <kde_places_version>4</kde_places_version>"]
+    for g in ("Places", "Devices", "RemovableDevices"):
+        lignes.append(f"   <GroupState-{g}-IsHidden>false</GroupState-{g}-IsHidden>")
+    for g in GROUPES_CACHES:
+        lignes.append(f"   <GroupState-{g}-IsHidden>true</GroupState-{g}-IsHidden>")
+    lignes += ["  </metadata>", " </info>"]
+    n = 0
+    for xdg, nom, icone in EMPLACEMENTS + [(None, "Corbeille", "user-trash")]:
+        href = "trash:/" if xdg is None else uri(dossier_xdg(xdg)) if dossier_xdg(xdg) else ""
+        if not href:
+            continue
+        n += 1
+        lignes += [f' <bookmark href="{escape(href)}">', f"  <title>{escape(nom)}</title>", "  <info>",
+                   '   <metadata owner="http://freedesktop.org">', f'    <bookmark:icon name="{icone}"/>',
+                   "   </metadata>", '   <metadata owner="http://www.kde.org">',
+                   f"    <ID>protectos/{n}</ID>", "    <isSystemItem>true</isSystemItem>",
+                   "   </metadata>", "  </info>", " </bookmark>"]
+    lignes.append("</xbel>")
+    return "\n".join(lignes) + "\n"
+
+
+def main():
+    if os.path.exists(MARQUE) and "--forcer" not in sys.argv:
+        return 0
+    try:
+        subprocess.run(["xdg-user-dirs-update"], capture_output=True, timeout=10)
+    except (OSError, subprocess.TimeoutExpired):
+        pass
+    if not os.path.exists(PLACES) or "--forcer" in sys.argv:
+        os.makedirs(os.path.dirname(PLACES), exist_ok=True)
+        with open(PLACES, "w", encoding="utf-8") as f:
+            f.write(emplacements_xbel())
+    os.makedirs(os.path.dirname(MARQUE), exist_ok=True)
+    open(MARQUE, "w").close()
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

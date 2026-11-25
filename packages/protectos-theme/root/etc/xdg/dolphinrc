@@ -1,0 +1,9 @@
+# Explorateur de fichiers protect.OS : simple, comme sous Windows
+[General]
+ShowFullPath=false
+RememberOpenedTabs=false
+BrowseThroughArchives=false
+ShowSelectionToggle=true
+ShowZoomSlider=true
+ShowSpaceInfo=true
+ConfirmClosingMultipleTabs=true

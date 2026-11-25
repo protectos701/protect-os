@@ -178,9 +178,11 @@ class CarteWindows(QFrame):
         g.setContentsMargins(14, 12, 14, 12)
         icone = chemin_icone(prog.get("icone", ""))
         if icone:
-            pastille = QLabel()
-            pastille.setFixedSize(44, 44)
-            pastille.setPixmap(QIcon(icone).pixmap(44, 44))
+            pastille = QLabel()   # tuile claire : l'icône reste lisible même si elle est sombre
+            pastille.setFixedSize(48, 48)
+            pastille.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            pastille.setStyleSheet("background: rgba(255,255,255,0.93); border-radius: 11px;")
+            pastille.setPixmap(QIcon(icone).pixmap(36, 36))
         else:
             pastille = QLabel(prog["nom"][:1].upper())
             pastille.setObjectName("pastille")

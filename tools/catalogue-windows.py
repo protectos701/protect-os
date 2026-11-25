@@ -96,7 +96,9 @@ def icone(ident, sites):
             im = im.convert("RGBA")
             if im.width < 16:
                 continue
-            im.thumbnail((96, 96), Image.LANCZOS)
+            echelle = 96 / max(im.width, im.height)   # agrandit aussi les petites icônes (favicon 16 ou 32 px)
+            im = im.resize((max(1, round(im.width * echelle)), max(1, round(im.height * echelle))),
+                           Image.NEAREST if im.width <= 32 else Image.LANCZOS)
             fond = Image.new("RGBA", (96, 96), (0, 0, 0, 0))
             fond.paste(im, ((96 - im.width) // 2, (96 - im.height) // 2), im)
             nom = re.sub(r"[^A-Za-z0-9.+-]", "_", ident) + ".png"

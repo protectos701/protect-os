@@ -22,7 +22,7 @@ jobs:
         run: |
           apt-get update
           apt-get install -y --no-install-recommends python3 python3-pyqt6 python3-pyqt6.qtsvg qt6-svg-plugins \
-            breeze-icon-theme fonts-noto-core fonts-dejavu-core libqt6svg6 locales
+            breeze-icon-theme fonts-noto-core fonts-dejavu-core libqt6svg6 locales ca-certificates
       - uses: actions/checkout@v4
       - name: Captures
         env:

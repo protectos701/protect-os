@@ -41,10 +41,8 @@ tasks.writeConfig("launchers", [
 panel.addWidget("org.kde.plasma.panelspacer");
 
 panel.addWidget("org.kde.plasma.systemtray");
-var clock = panel.addWidget("org.kde.plasma.digitalclock");
-clock.currentConfigGroup = ["Appearance"];
-clock.writeConfig("showDate", "true");
-clock.writeConfig("dateFormat", "shortDate");
+// Horloge protect.OS : au clic, météo animée, calendrier et notifications
+panel.addWidget("org.protectos.horloge");
 panel.addWidget("org.kde.plasma.showdesktop");
 
 // Fond d'écran protect.OS sur tous les bureaux

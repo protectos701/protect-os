@@ -128,6 +128,7 @@ def lire_conf():
         "clavier": g("langue", "clavier", ORIGINE["clavier"]) or ORIGINE["clavier"],
         "variante": g("langue", "variante"),
         "fuseau": g("langue", "fuseau", ORIGINE["fuseau"]) or ORIGINE["fuseau"],
+        "meteo": {"ville": g("meteo", "ville", "Paris") or "Paris"},
     }
     opts = {}
     for k, d in OPTIONS_ORIGINE.items():
@@ -155,6 +156,8 @@ def lire_conf():
     for pkg in c["ajouter"] + c["retirer"]:
         if not re.fullmatch(r"[a-z0-9][a-z0-9.+-]+", pkg):
             erreur(f"« {pkg} » n'est pas un nom de paquet valide")
+    if any(ch in c["meteo"]["ville"] for ch in "<>\"\\$`&"):
+        erreur("la ville de la météo ne doit pas contenir < > \" \\ $ ` ou &")
     if any(ch in c["nom"] for ch in "<>\"\\$`"):
         erreur("le nom ne doit pas contenir < > \" \\ $ ou `")
     return c
@@ -344,6 +347,15 @@ def appliquer_logiciels(c):
     return len(liste), ids
 
 
+def appliquer_meteo(c):
+    """Ville de la météo de l'horloge (valeur par défaut du gadget)."""
+    xml = os.path.join(THEME, "usr", "share", "plasma", "plasmoids", "org.protectos.horloge", "contents", "config", "main.xml")
+    if os.path.exists(xml):
+        from xml.sax.saxutils import escape
+        _remplacer(xml, r'(<entry name="ville" type="String"><default>)[^<]*(</default>)',
+                   lambda m: m.group(1) + escape(c["meteo"]["ville"]) + m.group(2))
+
+
 def appliquer_langue(c):
     lang = c["langue"][:2]
     paquets = LANGUES.get(lang, [])
@@ -516,6 +528,7 @@ def main():
     appliquer_protection(c)
     print(f"  Vie privée : bloqueur {o['bloqueur_pubs']}, Firefox confidentiel {o['firefox_confidentiel']}")
     appliquer_langue(c)
+    appliquer_meteo(c)
     print(f"  Langue, clavier et fuseau : {c['langue']}, {c['clavier']}, {c['fuseau']}")
     with open(STATE, "w", encoding="utf-8") as f:
         json.dump({"nom": c["nom"], "slogan": c["slogan"], "couleurs": table}, f, ensure_ascii=False, indent=1)

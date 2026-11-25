@@ -93,7 +93,7 @@ PlasmoidItem {
         sortMode: NotificationManager.Notifications.SortByDate
     }
 
-    toolTipMainText: Qt.formatDate(maintenant, "dddd d MMMM yyyy")
+    toolTipMainText: maintenant.toLocaleDateString(Qt.locale(), "dddd d MMMM yyyy")
     toolTipSubText: meteo ? Math.round(meteo.temp) + " °C · " + texteDe(meteo.code) : ""
 
     // ---------- Dans la barre des tâches
@@ -139,7 +139,7 @@ PlasmoidItem {
                     font.weight: Font.Light
                 }
                 PlasmaComponents.Label {
-                    text: { var t = Qt.formatDate(racine.maintenant, "dddd d MMMM yyyy"); return t.charAt(0).toUpperCase() + t.slice(1) }
+                    text: { var t = racine.maintenant.toLocaleDateString(Qt.locale(), "dddd d MMMM yyyy"); return t.charAt(0).toUpperCase() + t.slice(1) }
                     opacity: 0.85
                 }
             }

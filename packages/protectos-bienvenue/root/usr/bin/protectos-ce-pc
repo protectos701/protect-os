@@ -179,7 +179,7 @@ def main():
     def tuile(l):
         b = QToolButton()
         b.setAutoRaise(True)
-        b.setMinimumWidth(260)
+        b.setMinimumWidth(310)
         b.setSizePolicy(b.sizePolicy().horizontalPolicy(), b.sizePolicy().verticalPolicy())
         h = QHBoxLayout(b)
         h.setContentsMargins(8, 8, 8, 8)

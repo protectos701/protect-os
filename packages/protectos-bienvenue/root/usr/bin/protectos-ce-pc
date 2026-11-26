@@ -64,7 +64,7 @@ def lecteurs():
     """Liste ordonnée de lecteurs : C: = le système, puis D:, E:… dans l'ordre des disques."""
     total, libre = espace("/")
     liste = [{"nom": "Disque local", "lettre": "C:", "point": "/", "total": total, "libre": libre,
-              "icone": "drive-harddisk-root", "chemin": None}]
+              "icone": "drive-harddisk", "chemin": None, "etiquette": ""}]
     lettre = ord("D")
     for n, disque in peripheriques():
         fs = n.get("fstype") or ""
@@ -75,7 +75,7 @@ def lecteurs():
         if n.get("type") == "rom":
             if not fs:
                 continue
-            icone, nom = "media-optical", n.get("label") or "Lecteur DVD"
+            icone, nom = "media-optical", "Lecteur de DVD"
         else:
             if fs in IGNORES_FS or point in POINTS_SYSTEME or ptype in (TYPE_EFI, TYPE_MSR):
                 continue
@@ -88,9 +88,10 @@ def lecteurs():
             else:
                 icone = "drive-harddisk"
                 nom = n.get("label") or ("Windows" if fs == "ntfs" else "Disque local")
-        t, l = espace(point) if point else (taille, None)
+        t, l = espace(point) if point and n.get("type") != "rom" else (taille, None)
         liste.append({"nom": nom, "lettre": chr(lettre) + ":", "point": point, "total": t, "libre": l,
-                      "icone": icone, "chemin": n.get("path")})
+                      "icone": icone, "chemin": n.get("path"),
+                      "etiquette": n.get("label") or "" if n.get("type") == "rom" else ""})
         lettre = min(lettre + 1, ord("Z"))
     return liste
 
@@ -187,7 +188,7 @@ def main():
         ic.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
         h.addWidget(ic)
         col = QVBoxLayout()
-        nom = QLabel(f"{l['nom']} ({l['lettre']})")
+        nom = QLabel(f"{l['nom']} ({l['lettre']}) {l['etiquette']}".strip())
         nom.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
         col.addWidget(nom)
         if l["libre"] is not None and l["total"]:
@@ -203,7 +204,7 @@ def main():
             col.addWidget(barre)
             info = QLabel(f"{taille_go(l['libre'])} disponibles sur {taille_go(l['total'])}")
         else:
-            info = QLabel(f"{taille_go(l['total'])} · cliquez pour ouvrir" if l["total"] else "Cliquez pour ouvrir")
+            info = QLabel(f"{taille_go(l['total'])}" if l["total"] else "Cliquez pour ouvrir")
         info.setEnabled(False)
         info.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
         col.addWidget(info)

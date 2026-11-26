@@ -23,6 +23,46 @@ INTERVALLE = 1500  # ms
 VITAUX = {"plasmashell", "kwin_wayland", "kwin_x11", "Xorg", "Xwayland", "systemd", "dbus-daemon",
           "dbus-broker", "startplasma-wayland", "startplasma-x11", "plasma_session", "ksmserver",
           "kded6", "sddm", "sddm-helper", "pipewire", "wireplumber", "pipewire-pulse"}
+# Noms compréhensibles pour les services du système (comme « Hôte de service » sous Windows)
+NOMS_SYSTEME = {
+    "plasmashell": "Bureau et barre des tâches", "kwin_wayland": "Gestionnaire de fenêtres",
+    "kwin_x11": "Gestionnaire de fenêtres", "kwin_wayland_wrapper": "Gestionnaire de fenêtres",
+    "Xwayland": "Compatibilité des anciennes applications", "Xorg": "Affichage",
+    "xwaylandvideobridge": "Partage d'écran", "kded6": "Services du bureau", "kded5": "Services du bureau",
+    "kioworker": "Accès aux fichiers", "kioslave5": "Accès aux fichiers", "kiod6": "Accès aux fichiers",
+    "plasma-discover": "Magasin d'applications", "DiscoverNotifier": "Recherche de mises à jour",
+    "polkit-kde-authentication-agent-1": "Demandes d'autorisation", "polkitd": "Autorisations",
+    "xdg-desktop-portal": "Fenêtres d'ouverture et d'enregistrement",
+    "xdg-desktop-portal-kde": "Fenêtres d'ouverture et d'enregistrement",
+    "xdg-desktop-portal-gtk": "Fenêtres d'ouverture et d'enregistrement",
+    "xdg-document-portal": "Partage de documents", "xdg-permission-store": "Autorisations des applications",
+    "ksmserver": "Gestion de la session", "startplasma-wayland": "Ouverture de session",
+    "startplasma-x11": "Ouverture de session", "plasma_session": "Ouverture de session",
+    "org_kde_powerdevil": "Gestion de l'alimentation", "kactivitymanagerd": "Gestion des activités",
+    "kglobalacceld": "Raccourcis clavier", "kglobalaccel": "Raccourcis clavier",
+    "pipewire": "Son", "pipewire-pulse": "Son", "wireplumber": "Son", "pulseaudio": "Son",
+    "dbus-daemon": "Communication entre programmes", "dbus-broker": "Communication entre programmes",
+    "dbus-broker-launch": "Communication entre programmes", "systemd": "Gestionnaire de services",
+    "kwalletd6": "Coffre-fort des mots de passe", "kwalletd5": "Coffre-fort des mots de passe",
+    "baloo_file": "Indexation des fichiers", "baloo_file_extractor": "Indexation des fichiers",
+    "ksystemstats": "Mesures du système", "kaccess": "Accessibilité", "at-spi-bus-launcher": "Accessibilité",
+    "at-spi2-registryd": "Accessibilité", "gmenudbusmenuproxy": "Menus des applications",
+    "xembedsniproxy": "Icônes de la zone de notification", "kscreen_backend_launcher": "Gestion des écrans",
+    "kdeconnectd": "Connexion au téléphone", "kalendarac": "Rappels du calendrier",
+    "ksecretd": "Coffre-fort des mots de passe", "kstatusnotifierwatcher": "Zone de notification",
+    "org.kde.kdeconnect.daemon": "Connexion au téléphone", "kded": "Services du bureau",
+    "NetworkManager": "Réseau", "ModemManager": "Réseau mobile", "wpa_supplicant": "Wi-Fi",
+    "udisksd": "Gestion des disques", "upowerd": "Batterie", "packagekitd": "Mises à jour",
+    "cupsd": "Impression", "cups-browsed": "Impression", "bluetoothd": "Bluetooth", "sddm": "Écran de connexion",
+    "sddm-helper": "Écran de connexion", "agetty": "Console", "sh": "Interpréteur de commandes",
+    "bash": "Interpréteur de commandes", "dash": "Interpréteur de commandes", "sudo": "Administrateur",
+    "pkexec": "Administrateur", "wine64-preloader": "Compatibilité Windows", "wineserver": "Compatibilité Windows",
+    "wine-preloader": "Compatibilité Windows", "winedevice.exe": "Compatibilité Windows",
+    "services.exe": "Compatibilité Windows", "plugplay.exe": "Compatibilité Windows",
+    "explorer.exe": "Compatibilité Windows", "rpcss.exe": "Compatibilité Windows",
+    "svchost.exe": "Compatibilité Windows", "tabtip.exe": "Compatibilité Windows",
+    "clamd": "Antivirus", "freshclam": "Antivirus", "ufw": "Pare-feu", "rsync": "Sauvegarde",
+}
 INTERPRETES = {"python3", "python", "sh", "bash", "dash", "perl", "env"}
 
 
@@ -106,7 +146,7 @@ def identite_processus(pid):
                 continue
             b = os.path.basename(a)
             return b, b
-    return exe or comm, comm or exe
+    return exe or comm, exe or comm
 
 
 class Processus:
@@ -149,7 +189,12 @@ class Processus:
             connu = self.connues.get(cle)
             g = groupes.get(cle)
             if g is None:
-                g = groupes[cle] = {"cle": cle, "nom": connu[0] if connu else base,
+                nom = NOMS_SYSTEME.get(cle) or NOMS_SYSTEME.get(base)
+                if not nom:
+                    nom = connu[0] if connu else base
+                elif cle not in self.connues:
+                    connu = None
+                g = groupes[cle] = {"cle": cle, "nom": nom,
                                     "icone": connu[1] if connu else "",
                                     "appli": bool(connu and not connu[2]) or cle.endswith(".exe"),
                                     "pids": [], "cpu": 0.0, "mem": 0, "vital": False}
@@ -158,7 +203,19 @@ class Processus:
             g["mem"] += rss
             g["vital"] = g["vital"] or base in VITAUX or cle in VITAUX or st.st_uid != self.uid
         self.prec, self.prec_total = actuels, total
-        return list(groupes.values())
+        # Les services qui portent le même nom (ex. « Son ») sont regroupés sur une seule ligne
+        fusion = {}
+        for g in groupes.values():
+            f = fusion.get((g["nom"], g["appli"]))
+            if f is None:
+                fusion[(g["nom"], g["appli"])] = g
+            else:
+                f["pids"] += g["pids"]
+                f["cpu"] += g["cpu"]
+                f["mem"] += g["mem"]
+                f["vital"] = f["vital"] or g["vital"]
+                f["icone"] = f["icone"] or g["icone"]
+        return list(fusion.values())
 
 
 def arreter(pids, force=False):

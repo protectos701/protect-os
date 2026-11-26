@@ -70,6 +70,28 @@ def emplacements_xbel():
     return "\n".join(lignes) + "\n"
 
 
+BUREAU = {  # icônes du bureau, comme sous Windows
+    "ce-pc.desktop": "[Desktop Entry]\nType=Application\nName=Ce PC\nIcon=computer\nExec=protectos-ce-pc\n"
+                     "Terminal=false\n",
+    "corbeille.desktop": "[Desktop Entry]\nType=Link\nName=Corbeille\nIcon=user-trash-full\n"
+                         "EmptyIcon=user-trash\nURL=trash:/\n",
+}
+
+
+def icones_bureau():
+    bureau = dossier_xdg("DESKTOP") or os.path.expanduser("~/Bureau")
+    try:
+        os.makedirs(bureau, exist_ok=True)
+        for nom, contenu in BUREAU.items():
+            chemin = os.path.join(bureau, nom)
+            if not os.path.exists(chemin):
+                with open(chemin, "w", encoding="utf-8") as f:
+                    f.write(contenu)
+                os.chmod(chemin, 0o755)  # Plasma n'exécute que les raccourcis marqués exécutables
+    except OSError:
+        pass
+
+
 def main():
     if os.path.exists(MARQUE) and "--forcer" not in sys.argv:
         return 0
@@ -93,6 +115,7 @@ def main():
                 subprocess.run(["xdg-user-dirs-update", "--set", cle, os.path.expanduser("~")], capture_output=True)
         except OSError:
             pass
+    icones_bureau()
     os.makedirs(os.path.dirname(MARQUE), exist_ok=True)
     open(MARQUE, "w").close()
     return 0

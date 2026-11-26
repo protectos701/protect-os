@@ -83,3 +83,35 @@ fun message_callback(text) {
     msg.sprite.SetY(H - 50);
 }
 Plymouth.SetMessageFunction(message_callback);
+
+# Arrêt, redémarrage, mises à jour : message et petits points dorés qui tournent (comme sous Windows)
+mode = Plymouth.GetMode();
+etat_texte = "";
+if (mode == "shutdown") etat_texte = "Arrêt en cours…";
+if (mode == "reboot") etat_texte = "Redémarrage en cours…";
+if (mode == "updates" || mode == "system-upgrade") etat_texte = "Installation des mises à jour… N'éteignez pas l'ordinateur.";
+
+if (etat_texte != "") {
+    track.sprite.SetOpacity(0);
+    fill.sprite.SetOpacity(0);
+    etat.image = Image.Text(etat_texte, 0.93, 0.95, 0.98, 1, "Sans 13");
+    etat.sprite = Sprite(etat.image);
+    etat.sprite.SetX(W / 2 - etat.image.GetWidth() / 2);
+    etat.sprite.SetY(bar_y + 46);
+    point.image = Image("fill.png").Scale(6, 6);
+    for (i = 0; i < 6; i++) {
+        points[i] = Sprite(point.image);
+        points[i].SetZ(4);
+    }
+    global.tour = 0;
+    fun tourner() {
+        global.tour = global.tour + 1;
+        for (i = 0; i < 6; i++) {
+            a = (global.tour * 0.09) - i * 0.32;
+            points[i].SetX(W / 2 + Math.Cos(a) * 14 - 3);
+            points[i].SetY(bar_y + 8 + Math.Sin(a) * 14 - 3);
+            points[i].SetOpacity(1 - i * 0.14);
+        }
+    }
+    Plymouth.SetRefreshFunction(tourner);
+}

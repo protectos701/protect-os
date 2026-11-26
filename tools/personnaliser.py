@@ -56,7 +56,7 @@ EPINGLES = {
 
 NOMS_APPS = {  # clé de [noms_applications] → fichier .desktop du logiciel
     "explorateur": "org.kde.dolphin.desktop", "terminal": "org.kde.konsole.desktop",
-    "capture": "org.kde.spectacle.desktop", "gestionnaire_taches": "org.kde.plasma-systemmonitor.desktop",
+    "capture": "org.kde.spectacle.desktop", "gestionnaire_taches": "protectos-gestionnaire-taches.desktop",
     "pdf": "org.kde.okular.desktop", "photos": "org.kde.gwenview.desktop", "editeur": "org.kde.kate.desktop",
     "calculatrice": "org.kde.kcalc.desktop", "magasin": "org.kde.discover.desktop",
     "parametres": "systemsettings.desktop", "archives": "org.kde.ark.desktop",
@@ -70,7 +70,7 @@ NOMS_ORIGINE = {
 }
 RACCOURCIS = {  # clé de [raccourcis] → (application, action KDE)
     "explorateur": ("org.kde.dolphin.desktop", "_launch"),
-    "gestionnaire_taches": ("org.kde.plasma-systemmonitor.desktop", "_launch"),
+    "gestionnaire_taches": ("protectos-gestionnaire-taches.desktop", "_launch"),
     "parametres": ("systemsettings.desktop", "_launch"),
     "terminal": ("org.kde.konsole.desktop", "_launch"),
     "capture_zone": ("org.kde.spectacle.desktop", "RectangularRegionScreenShot"),
@@ -466,8 +466,22 @@ def appliquer_noms_raccourcis(c):
             v = "\t".join(x for x in ("Alt+Space", v) if x)
         if v:
             groupes.setdefault(desktop, []).append(f"{action}={v}")
+    # Emojis (Windows+.) comme sous Windows
+    groupes.setdefault("org.kde.plasma.emojier.desktop", []).append("_launch=Meta+.")
     for desktop, entrees in groupes.items():
         out += ["", f"[services][{desktop}]"] + entrees
+    # Gestion des fenêtres façon Windows : Windows+↑ agrandit, Windows+↓ réduit, Windows+Tab montre
+    # toutes les fenêtres, Windows+V ouvre l'historique du presse-papiers.
+    out += ["", "[kwin]",
+            "Window Maximize=Meta+Up\tMeta+PgUp,Meta+PgUp,Agrandir la fenêtre",
+            "Window Minimize=Meta+Down\tMeta+PgDown,Meta+PgDown,Réduire la fenêtre",
+            "Window Quick Tile Top=none,Meta+Up,Mosaïque en haut",
+            "Window Quick Tile Bottom=none,Meta+Down,Mosaïque en bas",
+            "Overview=Meta+Tab\tMeta+W,Meta+W,Vue d'ensemble",
+            "", "[plasmashell]",
+            "next activity=none,Meta+Tab,Activité suivante",
+            "previous activity=none,Meta+Shift+Tab,Activité précédente",
+            "show-on-mouse-pos=Meta+V,Meta+V,Afficher le presse-papiers à la position de la souris"]
     with open(os.path.join(THEME, "etc", "xdg", "kglobalshortcutsrc"), "w", encoding="utf-8") as f:
         f.write("\n".join(out) + "\n")
 

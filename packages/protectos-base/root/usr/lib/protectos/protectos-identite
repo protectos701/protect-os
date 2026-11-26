@@ -50,7 +50,7 @@ CACHER = [
 # /etc/protectos/noms-applications.conf, qui passent en priorité).
 NOMS = {
     "org.kde.dolphin.desktop": "Explorateur de fichiers", "org.kde.konsole.desktop": "Terminal",
-    "org.kde.spectacle.desktop": "Capture d'écran", "org.kde.plasma-systemmonitor.desktop": "Gestionnaire des tâches",
+    "org.kde.spectacle.desktop": "Capture d'écran", "org.kde.plasma-systemmonitor.desktop": "Moniteur de ressources",
     "org.kde.okular.desktop": "Lecteur PDF", "org.kde.gwenview.desktop": "Photos", "org.kde.kate.desktop": "Bloc-notes",
     "org.kde.kcalc.desktop": "Calculatrice", "org.kde.discover.desktop": "Magasin d'applications",
     "systemsettings.desktop": "Paramètres", "org.kde.ark.desktop": "Archives",

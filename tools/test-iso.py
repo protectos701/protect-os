@@ -146,6 +146,24 @@ def clic(qmp, fx, fy, bouton="left"):
         time.sleep(0.1)
 
 
+def taper(qmp, texte):
+    """Tape un texte simple (lettres minuscules, chiffres et espaces)."""
+    for c in texte:
+        touches(qmp, "spc" if c == " " else c)
+        time.sleep(0.12)
+
+
+def enchainer(*etapes):
+    """Exécute plusieurs actions à la suite (une action = fonction, un nombre = pause en secondes)."""
+    def faire():
+        for e in etapes:
+            if callable(e):
+                e()
+            else:
+                time.sleep(e)
+    return faire
+
+
 def visite(qmp, sortie):
     """Parcourt l'interface comme un utilisateur et capture chaque étape."""
     etapes = []
@@ -161,6 +179,11 @@ def visite(qmp, sortie):
         ("explorateur", lambda: touches(qmp, "meta_l", "e"), 7, None),
         ("parametres", lambda: touches(qmp, "meta_l", "i"), 9, None),
         ("horloge", lambda: clic(qmp, 0.932, 0.965), 8, lambda: touches(qmp, "esc")),
+        ("clic-droit-bureau", enchainer(lambda: touches(qmp, "meta_l", "d"), 2.5, lambda: clic(qmp, 0.42, 0.45, "right")),
+         3, enchainer(lambda: touches(qmp, "esc"), 1, lambda: touches(qmp, "meta_l", "d"))),
+        ("gestionnaire-taches", lambda: touches(qmp, "ctrl", "shift", "esc"), 8, None),
+        ("ce-pc", enchainer(lambda: touches(qmp, "meta_l"), 2.5, lambda: taper(qmp, "ce pc"), 2.5,
+                            lambda: touches(qmp, "ret")), 8, None),
         ("alt-tab", lambda: touches(qmp, "alt", "tab", tenir=14000), 9, None),
     ]:
         try:

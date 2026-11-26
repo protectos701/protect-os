@@ -1,0 +1,18 @@
+[Desktop Entry]
+Type=Application
+Name=Gestionnaire des tâches
+Comment=Applications ouvertes, performances de l'ordinateur et programmes de démarrage
+Exec=protectos-gestionnaire-taches
+Icon=utilities-system-monitor
+Terminal=false
+Categories=Qt;System;Monitor;
+Keywords=tâches;processus;fin de tâche;bloqué;ne répond pas;performances;processeur;mémoire;démarrage;
+Actions=Performances;Demarrage;
+
+[Desktop Action Performances]
+Name=Performances
+Exec=protectos-gestionnaire-taches --performances
+
+[Desktop Action Demarrage]
+Name=Applications de démarrage
+Exec=protectos-gestionnaire-taches --demarrage

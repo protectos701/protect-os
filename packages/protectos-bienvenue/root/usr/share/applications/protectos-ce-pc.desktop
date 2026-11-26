@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Ce PC
+Comment=Vos dossiers et les lecteurs de l'ordinateur : Disque local (C:), clés USB, DVD
+Exec=protectos-ce-pc
+Icon=computer
+Terminal=false
+Categories=Qt;System;FileManager;
+Keywords=ordinateur;poste de travail;disque;C:;lecteur;clé USB;DVD;espace libre;

@@ -1,0 +1,700 @@
+#!/usr/bin/python3
+"""Gestionnaire des tâches de protect.OS (Ctrl+Maj+Échap), comme sous Windows.
+
+  Processus       applications ouvertes et processus en arrière-plan, avec « Fin de tâche »
+  Performances    processeur, mémoire, disque et réseau en temps réel
+  Démarrage       programmes lancés à l'ouverture de session (activer / désactiver)
+
+Tout est lu dans /proc : aucune dépendance en plus de PyQt6.
+"""
+import configparser
+import glob
+import os
+import shlex
+import signal
+import sys
+import time
+
+OR = "#d4a72c"
+BLEU = "#2f6fd6"
+INTERVALLE = 1500  # ms
+
+# Processus qui ne doivent pas être arrêtés par erreur (la session s'arrêterait)
+VITAUX = {"plasmashell", "kwin_wayland", "kwin_x11", "Xorg", "Xwayland", "systemd", "dbus-daemon",
+          "dbus-broker", "startplasma-wayland", "startplasma-x11", "plasma_session", "ksmserver",
+          "kded6", "sddm", "sddm-helper", "pipewire", "wireplumber", "pipewire-pulse"}
+INTERPRETES = {"python3", "python", "sh", "bash", "dash", "perl", "env"}
+
+
+# ----------------------------------------------------------------- lecture de /proc
+def lire(chemin, mode="r"):
+    try:
+        with open(chemin, mode) as f:
+            return f.read()
+    except OSError:
+        return b"" if "b" in mode else ""
+
+
+def total_cpu():
+    """(occupé, total) en jiffies pour l'ensemble des processeurs."""
+    champs = lire("/proc/stat").splitlines()[0].split()[1:]
+    v = [int(x) for x in champs[:8]]
+    inactif = v[3] + v[4]
+    return sum(v) - inactif, sum(v)
+
+
+def applications_connues():
+    """Nom d'exécutable → (nom affiché, icône) d'après les raccourcis du menu."""
+    connues = {}
+    dossiers = ["/usr/share/applications", "/usr/local/share/applications",
+                os.path.expanduser("~/.local/share/applications"),
+                "/var/lib/flatpak/exports/share/applications"]
+    for d in dossiers:  # les derniers dossiers (personnalisations) l'emportent
+        for f in sorted(glob.glob(os.path.join(d, "**", "*.desktop"), recursive=True)):
+            cp = configparser.RawConfigParser(strict=False, interpolation=None)
+            cp.optionxform = str
+            try:
+                cp.read(f, encoding="utf-8")
+                e = cp["Desktop Entry"]
+            except (configparser.Error, KeyError, UnicodeDecodeError):
+                continue
+            if e.get("Type", "Application") != "Application" or not e.get("Exec"):
+                continue
+            nom = e.get("Name[fr]") or e.get("Name")
+            try:
+                arg = shlex.split(e["Exec"])
+            except ValueError:
+                continue
+            while arg and (arg[0] == "env" or "=" in arg[0]):
+                arg = arg[1:]
+            if not arg:
+                continue
+            cle = os.path.basename(arg[0])
+            if cle in INTERPRETES and len(arg) > 1:
+                cle = os.path.basename(arg[1])
+            if cle == "flatpak" and "run" in arg:
+                cle = arg[-1].split(".")[-1].lower()
+            masque = e.get("NoDisplay", "false") == "true"
+            if cle not in connues or not masque:
+                connues[cle] = (nom, e.get("Icon", ""), masque)
+    return connues
+
+
+def identite_processus(pid):
+    """(clé, nom de base) d'un processus, ou None pour un fil du noyau."""
+    brut = lire(f"/proc/{pid}/cmdline", "rb")
+    if not brut:
+        return None
+    args = [a.decode("utf-8", "replace") for a in brut.split(b"\0") if a]
+    if not args:
+        return None
+    comm = lire(f"/proc/{pid}/comm").strip()
+    exe = os.path.basename(args[0].split(" ")[0])
+    # Programmes Windows : on montre le nom du .exe
+    for a in args:
+        if a.lower().endswith(".exe") and ("wine" in comm or "wine" in exe or a[1:3] == ":\\"):
+            base = a.replace("\\", "/").rsplit("/", 1)[-1]
+            return base.lower(), base
+    if exe in INTERPRETES or comm in INTERPRETES:
+        suite = iter(args[1:])
+        for a in suite:
+            if a == "-c":
+                break
+            if a == "-m":
+                a = next(suite, exe)
+            elif a.startswith("-"):
+                continue
+            b = os.path.basename(a)
+            return b, b
+    return exe or comm, comm or exe
+
+
+class Processus:
+    def __init__(self):
+        self.prec = {}  # pid → jiffies
+        self.prec_total = 0
+        self.uid = os.getuid()
+        self.connues = applications_connues()
+        self.page = os.sysconf("SC_PAGE_SIZE")
+
+    def mesurer(self, tous=False):
+        """Liste de groupes : {cle, nom, icone, appli, pids, cpu, mem}."""
+        _, total = total_cpu()
+        dt = max(1, total - self.prec_total) if self.prec_total else 0
+        groupes = {}
+        actuels = {}
+        for d in os.listdir("/proc"):
+            if not d.isdigit():
+                continue
+            pid = int(d)
+            try:
+                st = os.stat(f"/proc/{pid}")
+            except OSError:
+                continue
+            if not tous and st.st_uid != self.uid:
+                continue
+            ident = identite_processus(pid)
+            if not ident:
+                continue
+            stat = lire(f"/proc/{pid}/stat")
+            try:
+                champs = stat.rsplit(")", 1)[1].split()
+                jif = int(champs[11]) + int(champs[12])
+                rss = int(champs[21]) * self.page
+            except (IndexError, ValueError):
+                continue
+            actuels[pid] = jif
+            cpu = 100.0 * (jif - self.prec.get(pid, jif)) / dt if dt else 0.0
+            cle, base = ident
+            connu = self.connues.get(cle)
+            g = groupes.get(cle)
+            if g is None:
+                g = groupes[cle] = {"cle": cle, "nom": connu[0] if connu else base,
+                                    "icone": connu[1] if connu else "",
+                                    "appli": bool(connu and not connu[2]) or cle.endswith(".exe"),
+                                    "pids": [], "cpu": 0.0, "mem": 0, "vital": False}
+            g["pids"].append(pid)
+            g["cpu"] += cpu
+            g["mem"] += rss
+            g["vital"] = g["vital"] or base in VITAUX or cle in VITAUX or st.st_uid != self.uid
+        self.prec, self.prec_total = actuels, total
+        return list(groupes.values())
+
+
+def arreter(pids, force=False):
+    for pid in pids:
+        try:
+            os.kill(pid, signal.SIGKILL if force else signal.SIGTERM)
+        except OSError:
+            pass
+
+
+class Mesures:
+    """Processeur, mémoire, disque et réseau (débits calculés entre deux appels)."""
+
+    def __init__(self):
+        self.t = time.monotonic()
+        self.cpu = total_cpu()
+        self.disque = self._disques()
+        self.reseau = self._reseau()
+
+    @staticmethod
+    def _disques():
+        lu = ecrit = actif = 0
+        for ligne in lire("/proc/diskstats").splitlines():
+            c = ligne.split()
+            if len(c) < 14:
+                continue
+            nom = c[2]
+            entier = (nom[:2] in ("sd", "vd", "hd", "xv") and nom[-1].isalpha()) or \
+                     (nom.startswith(("nvme", "mmcblk")) and "p" not in nom.split("n", 2)[-1][1:])
+            if not entier or nom.startswith(("loop", "ram", "zram", "dm-", "sr")):
+                continue
+            lu += int(c[5]) * 512
+            ecrit += int(c[9]) * 512
+            actif = max(actif, int(c[12]))
+        return lu, ecrit, actif
+
+    @staticmethod
+    def _reseau():
+        rx = tx = 0
+        for ligne in lire("/proc/net/dev").splitlines()[2:]:
+            nom, _, reste = ligne.partition(":")
+            if nom.strip() == "lo":
+                continue
+            c = reste.split()
+            if len(c) >= 9:
+                rx += int(c[0])
+                tx += int(c[8])
+        return rx, tx
+
+    def lire(self):
+        t = time.monotonic()
+        dt = max(0.001, t - self.t)
+        cpu = total_cpu()
+        occ = (cpu[0] - self.cpu[0]) / max(1, cpu[1] - self.cpu[1]) * 100
+        disque, reseau = self._disques(), self._reseau()
+        lu = (disque[0] - self.disque[0]) / dt
+        ecrit = (disque[1] - self.disque[1]) / dt
+        activite = min(100.0, (disque[2] - self.disque[2]) / (dt * 10))
+        rx = (reseau[0] - self.reseau[0]) / dt
+        tx = (reseau[1] - self.reseau[1]) / dt
+        self.t, self.cpu, self.disque, self.reseau = t, cpu, disque, reseau
+        mem = {}
+        for ligne in lire("/proc/meminfo").splitlines():
+            k, _, v = ligne.partition(":")
+            mem[k] = int(v.split()[0]) * 1024 if v.split() else 0
+        mhz = [float(l.split(":")[1]) for l in lire("/proc/cpuinfo").splitlines() if l.startswith("cpu MHz")]
+        return {"cpu": max(0.0, min(100.0, occ)), "ghz": (sum(mhz) / len(mhz) / 1000) if mhz else 0,
+                "mem_total": mem.get("MemTotal", 0), "mem_dispo": mem.get("MemAvailable", 0),
+                "lu": max(0, lu), "ecrit": max(0, ecrit), "disque": max(0.0, activite),
+                "rx": max(0, rx), "tx": max(0, tx)}
+
+
+def taille(o, debit=False):
+    unites = ["o", "Ko", "Mo", "Go", "To"]
+    v = float(o)
+    i = 0
+    while v >= 1024 and i < len(unites) - 1:
+        v /= 1024
+        i += 1
+    txt = (f"{v:.0f}" if v >= 100 or i == 0 else f"{v:.1f}").replace(".", ",") + " " + unites[i]
+    return txt + "/s" if debit else txt
+
+
+def duree(secondes):
+    s = int(secondes)
+    j, s = divmod(s, 86400)
+    h, s = divmod(s, 3600)
+    m, s = divmod(s, 60)
+    return f"{j}:{h:02d}:{m:02d}:{s:02d}"
+
+
+# ----------------------------------------------------------------- démarrage
+AUTOSTART_SYSTEME = "/etc/xdg/autostart"
+AUTOSTART_PERSO = os.path.expanduser("~/.config/autostart")
+INTERNES = ("org.kde.", "kde", "plasma", "protectos", "at-spi", "xdg-user-dirs", "pulseaudio", "pipewire",
+            "geoclue", "gnome-keyring", "polkit", "baloo", "klipper", "kaccess", "kalendarac", "powerdevil",
+            "xembed", "spice-vdagent", "im-launch", "user-dirs", "print-applet", "kup", "kglobalaccel",
+            "gmenudbusmenuproxy", "ibus", "fcitx", "orca", "snap-userd", "nm-applet", "blueman")
+
+
+def entrees_demarrage():
+    entrees = {}
+    for dossier, perso in ((AUTOSTART_SYSTEME, False), (AUTOSTART_PERSO, True)):
+        for f in sorted(glob.glob(os.path.join(dossier, "*.desktop"))):
+            nom = os.path.basename(f)
+            cp = configparser.RawConfigParser(strict=False, interpolation=None)
+            cp.optionxform = str
+            try:
+                cp.read(f, encoding="utf-8")
+                e = cp["Desktop Entry"]
+            except (configparser.Error, KeyError, UnicodeDecodeError):
+                continue
+            if not perso and (nom.lower().startswith(INTERNES) or e.get("NoDisplay") == "true"
+                              or e.get("X-KDE-autostart-phase")):
+                continue
+            if nom in entrees and not perso:
+                continue
+            ancien = entrees.get(nom, {})
+            entrees[nom] = {
+                "fichier": nom,
+                "nom": e.get("Name[fr]") or e.get("Name") or ancien.get("nom") or nom[:-8],
+                "icone": e.get("Icon", ancien.get("icone", "")),
+                "editeur": e.get("X-ProtectOS-Editeur", ""),
+                "actif": e.get("Hidden", "false") != "true" and e.get("X-GNOME-Autostart-enabled", "true") != "false",
+                "systeme": ancien.get("systeme", False) or not perso,
+            }
+    return sorted(entrees.values(), key=lambda x: x["nom"].lower())
+
+
+def basculer_demarrage(entree, actif):
+    os.makedirs(AUTOSTART_PERSO, exist_ok=True)
+    perso = os.path.join(AUTOSTART_PERSO, entree["fichier"])
+    if entree["systeme"]:
+        if actif:  # on retire simplement notre exception
+            if os.path.exists(perso):
+                os.remove(perso)
+            return
+        with open(perso, "w", encoding="utf-8") as f:
+            f.write(f"[Desktop Entry]\nType=Application\nName={entree['nom']}\nHidden=true\n")
+        return
+    lignes = [l for l in lire(perso).splitlines() if not l.startswith("Hidden=")]
+    sortie = []
+    for l in lignes:
+        sortie.append(l)
+        if l.strip() == "[Desktop Entry]" and not actif:
+            sortie.append("Hidden=true")
+    with open(perso, "w", encoding="utf-8") as f:
+        f.write("\n".join(sortie) + "\n")
+
+
+# ----------------------------------------------------------------- interface
+def main():
+    from PyQt6.QtCore import QPointF, QRectF, Qt, QTimer
+    from PyQt6.QtGui import QColor, QFont, QIcon, QPainter, QPainterPath, QPen, QBrush, QKeySequence, QShortcut
+    from PyQt6.QtWidgets import (QAbstractItemView, QApplication, QCheckBox, QHBoxLayout, QHeaderView,
+                                 QLabel, QListWidget, QListWidgetItem, QMessageBox, QPushButton,
+                                 QStackedWidget, QTabWidget, QTreeWidget, QTreeWidgetItem, QVBoxLayout,
+                                 QWidget, QGridLayout, QLineEdit)
+
+    class Courbe(QWidget):
+        """Graphique déroulant façon Windows : 60 dernières mesures, de 0 à 100 %."""
+
+        def __init__(self, couleur, mini=False):
+            super().__init__()
+            self.valeurs = [0.0] * 60
+            self.couleur = QColor(couleur)
+            self.mini = mini
+            self.setMinimumHeight(34 if mini else 220)
+            if mini:
+                self.setFixedWidth(64)
+
+        def ajouter(self, v):
+            self.valeurs = self.valeurs[1:] + [max(0.0, min(100.0, v))]
+            self.update()
+
+        def paintEvent(self, _):
+            p = QPainter(self)
+            p.setRenderHint(QPainter.RenderHint.Antialiasing)
+            r = QRectF(self.rect()).adjusted(0.5, 0.5, -0.5, -0.5)
+            fond = QColor(self.couleur)
+            fond.setAlpha(18)
+            p.fillRect(r, fond)
+            if not self.mini:
+                grille = QColor(self.couleur)
+                grille.setAlpha(40)
+                p.setPen(QPen(grille, 1))
+                for i in range(1, 10):
+                    x = r.left() + r.width() * i / 10
+                    p.drawLine(QPointF(x, r.top()), QPointF(x, r.bottom()))
+                for i in range(1, 5):
+                    y = r.top() + r.height() * i / 5
+                    p.drawLine(QPointF(r.left(), y), QPointF(r.right(), y))
+            n = len(self.valeurs)
+            chemin = QPainterPath(QPointF(r.left(), r.bottom()))
+            for i, v in enumerate(self.valeurs):
+                chemin.lineTo(QPointF(r.left() + r.width() * i / (n - 1), r.bottom() - r.height() * v / 100))
+            ligne = QPainterPath(chemin)
+            chemin.lineTo(QPointF(r.right(), r.bottom()))
+            chemin.closeSubpath()
+            remplissage = QColor(self.couleur)
+            remplissage.setAlpha(70)
+            p.fillPath(chemin, QBrush(remplissage))
+            p.setPen(QPen(self.couleur, 1.6))
+            p.drawPath(ligne)
+            p.setPen(QPen(self.couleur, 1))
+            p.setBrush(Qt.BrushStyle.NoBrush)
+            p.drawRect(r)
+
+    app = QApplication(sys.argv)
+    app.setApplicationName("protectos-gestionnaire-taches")
+    app.setApplicationDisplayName("Gestionnaire des tâches")
+    app.setDesktopFileName("protectos-gestionnaire-taches")
+    app.setWindowIcon(QIcon.fromTheme("utilities-system-monitor"))
+
+    fen = QWidget()
+    fen.setWindowTitle("Gestionnaire des tâches")
+    fen.resize(900, 620)
+    racine = QVBoxLayout(fen)
+    onglets = QTabWidget()
+    racine.addWidget(onglets)
+
+    # ---- Processus
+    proc = Processus()
+    page_p = QWidget()
+    vp = QVBoxLayout(page_p)
+    haut = QHBoxLayout()
+    recherche = QLineEdit()
+    recherche.setPlaceholderText("Rechercher un nom…")
+    recherche.setClearButtonEnabled(True)
+    tous = QCheckBox("Processus de tous les utilisateurs")
+    haut.addWidget(recherche, 1)
+    haut.addWidget(tous)
+    vp.addLayout(haut)
+    arbre = QTreeWidget()
+    arbre.setColumnCount(3)
+    arbre.setHeaderLabels(["Nom", "Processeur", "Mémoire"])
+    arbre.setRootIsDecorated(False)
+    arbre.setUniformRowHeights(True)
+    arbre.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
+    arbre.header().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
+    for c in (1, 2):
+        arbre.header().setSectionResizeMode(c, QHeaderView.ResizeMode.ResizeToContents)
+    arbre.setSortingEnabled(False)
+    vp.addWidget(arbre, 1)
+    bas = QHBoxLayout()
+    resume = QLabel()
+    bas.addWidget(resume, 1)
+    fin = QPushButton(QIcon.fromTheme("process-stop"), "Fin de tâche")
+    fin.setEnabled(False)
+    bas.addWidget(fin)
+    vp.addLayout(bas)
+    onglets.addTab(page_p, QIcon.fromTheme("view-list-details"), "Processus")
+
+    etat = {"selection": None, "groupes": {}}
+    gras = QFont(arbre.font())
+    gras.setBold(True)
+
+    def section(titre, n):
+        it = QTreeWidgetItem([f"{titre} ({n})", "", ""])
+        it.setFont(0, gras)
+        it.setFlags(Qt.ItemFlag.ItemIsEnabled)
+        it.setForeground(0, QColor(OR))
+        return it
+
+    def remplir():
+        groupes = proc.mesurer(tous.isChecked())
+        filtre = recherche.text().strip().lower()
+        if filtre:
+            groupes = [g for g in groupes if filtre in g["nom"].lower() or filtre in g["cle"].lower()]
+        etat["groupes"] = {g["cle"]: g for g in groupes}
+        applis = sorted([g for g in groupes if g["appli"]], key=lambda g: g["nom"].lower())
+        fond = sorted([g for g in groupes if not g["appli"]], key=lambda g: (-g["mem"], g["nom"].lower()))
+        defile = arbre.verticalScrollBar().value()
+        arbre.setUpdatesEnabled(False)
+        arbre.clear()
+        choisi = None
+        for titre, liste in (("Applications", applis), ("Processus en arrière-plan", fond)):
+            if not liste:
+                continue
+            arbre.addTopLevelItem(section(titre, len(liste)))
+            for g in liste:
+                nom = g["nom"] + (f" ({len(g['pids'])})" if len(g["pids"]) > 1 else "")
+                it = QTreeWidgetItem([nom, f"{g['cpu']:.1f} %".replace(".", ","), taille(g["mem"])])
+                icone = QIcon.fromTheme(g["icone"]) if g["icone"] else QIcon()
+                if icone.isNull():
+                    icone = QIcon.fromTheme("application-x-ms-dos-executable" if g["cle"].endswith(".exe")
+                                            else "application-x-executable")
+                it.setIcon(0, icone)
+                it.setData(0, Qt.ItemDataRole.UserRole, g["cle"])
+                for c in (1, 2):
+                    it.setTextAlignment(c, Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+                arbre.addTopLevelItem(it)
+                if g["cle"] == etat["selection"]:
+                    choisi = it
+        if choisi:
+            arbre.setCurrentItem(choisi)
+        arbre.verticalScrollBar().setValue(defile)
+        arbre.setUpdatesEnabled(True)
+        total = len([1 for g in groupes for _ in g["pids"]])
+        resume.setText(f"{total} processus · {len(applis)} applications ouvertes")
+        maj_bouton()
+
+    def maj_bouton():
+        it = arbre.currentItem()
+        cle = it.data(0, Qt.ItemDataRole.UserRole) if it else None
+        g = etat["groupes"].get(cle)
+        fin.setEnabled(bool(g) and not g["vital"])
+        fin.setToolTip("" if not g or not g["vital"] else
+                       "Ce processus est indispensable au fonctionnement de protect.OS.")
+
+    def selection():
+        it = arbre.currentItem()
+        etat["selection"] = it.data(0, Qt.ItemDataRole.UserRole) if it else None
+        maj_bouton()
+
+    def fin_de_tache():
+        g = etat["groupes"].get(etat["selection"])
+        if not g or g["vital"]:
+            return
+        arreter(g["pids"])
+        pids = list(g["pids"])
+
+        def forcer():
+            vivants = [p for p in pids if os.path.exists(f"/proc/{p}")]
+            if vivants:
+                rep = QMessageBox.question(fen, "Gestionnaire des tâches",
+                                           f"« {g['nom']} » ne répond pas. Forcer l'arrêt ?\n\n"
+                                           "Les données non enregistrées seront perdues.")
+                if rep == QMessageBox.StandardButton.Yes:
+                    arreter(vivants, force=True)
+            remplir()
+        QTimer.singleShot(3000, forcer)
+        QTimer.singleShot(300, remplir)
+
+    arbre.itemSelectionChanged.connect(selection)
+    fin.clicked.connect(fin_de_tache)
+    QShortcut(QKeySequence("Delete"), arbre, activated=fin_de_tache)
+    tous.toggled.connect(lambda _: remplir())
+    recherche.textChanged.connect(lambda _: remplir())
+
+    # ---- Performances
+    mes = Mesures()
+    page_perf = QWidget()
+    hp = QHBoxLayout(page_perf)
+    liste = QListWidget()
+    liste.setFixedWidth(250)
+    liste.setIconSize(liste.iconSize())
+    pile = QStackedWidget()
+    hp.addWidget(liste)
+    hp.addWidget(pile, 1)
+    cartes = {}
+    debut = time.time()
+    try:
+        uptime0 = float(lire("/proc/uptime").split()[0])
+    except (IndexError, ValueError):
+        uptime0 = 0.0
+    modele = ""
+    for l in lire("/proc/cpuinfo").splitlines():
+        if l.startswith("model name"):
+            modele = l.split(":", 1)[1].strip()
+            break
+
+    def carte(cle, titre, sous_titre, couleur, details):
+        mini = Courbe(couleur, mini=True)
+        w = QWidget()
+        h = QHBoxLayout(w)
+        h.setContentsMargins(6, 6, 6, 6)
+        h.addWidget(mini)
+        tv = QVBoxLayout()
+        t = QLabel(f"<b>{titre}</b>")
+        s = QLabel(sous_titre)
+        s.setEnabled(False)
+        tv.addWidget(t)
+        tv.addWidget(s)
+        h.addLayout(tv, 1)
+        it = QListWidgetItem()
+        it.setSizeHint(w.sizeHint())
+        liste.addItem(it)
+        liste.setItemWidget(it, w)
+        page = QWidget()
+        v = QVBoxLayout(page)
+        tete = QHBoxLayout()
+        gros = QLabel(titre)
+        f = QFont(gros.font())
+        f.setPointSizeF(f.pointSizeF() * 1.8)
+        gros.setFont(f)
+        tete.addWidget(gros)
+        tete.addStretch(1)
+        nom = QLabel(details)
+        nom.setEnabled(False)
+        tete.addWidget(nom)
+        v.addLayout(tete)
+        grand = Courbe(couleur)
+        v.addWidget(grand, 1)
+        grille = QGridLayout()
+        v.addLayout(grille)
+        pile.addWidget(page)
+        cartes[cle] = {"mini": mini, "grand": grand, "sous": s, "grille": grille, "valeurs": {}}
+
+    def valeur(cle, libelle, texte, ligne, col):
+        c = cartes[cle]
+        if libelle not in c["valeurs"]:
+            l1 = QLabel(libelle)
+            l1.setEnabled(False)
+            l2 = QLabel()
+            f = QFont(l2.font())
+            f.setPointSizeF(f.pointSizeF() * 1.35)
+            l2.setFont(f)
+            c["grille"].addWidget(l1, ligne * 2, col)
+            c["grille"].addWidget(l2, ligne * 2 + 1, col)
+            c["valeurs"][libelle] = l2
+        c["valeurs"][libelle].setText(texte)
+
+    carte("cpu", "Processeur", "0 %", BLEU, modele)
+    carte("mem", "Mémoire", "", "#8e5bd6", "")
+    carte("disque", "Disque", "0 %", "#2fa86b", "")
+    carte("reseau", "Réseau", "", OR, "Wi-Fi et Ethernet")
+    liste.currentRowChanged.connect(pile.setCurrentIndex)
+    liste.setCurrentRow(0)
+    reseau_max = [1024 * 1024.0]
+
+    def perf():
+        m = mes.lire()
+        c = cartes["cpu"]
+        c["mini"].ajouter(m["cpu"])
+        c["grand"].ajouter(m["cpu"])
+        c["sous"].setText(f"{m['cpu']:.0f} %  {m['ghz']:.2f} GHz".replace(".", ","))
+        valeur("cpu", "Utilisation", f"{m['cpu']:.0f} %", 0, 0)
+        valeur("cpu", "Vitesse", f"{m['ghz']:.2f} GHz".replace(".", ","), 0, 1)
+        valeur("cpu", "Cœurs logiques", str(os.cpu_count()), 0, 2)
+        valeur("cpu", "Temps d'activité", duree(uptime0 + time.time() - debut), 1, 0)
+        utilise = m["mem_total"] - m["mem_dispo"]
+        pct = 100 * utilise / max(1, m["mem_total"])
+        c = cartes["mem"]
+        c["mini"].ajouter(pct)
+        c["grand"].ajouter(pct)
+        c["sous"].setText(f"{taille(utilise)} / {taille(m['mem_total'])} ({pct:.0f} %)")
+        valeur("mem", "Utilisée", taille(utilise), 0, 0)
+        valeur("mem", "Disponible", taille(m["mem_dispo"]), 0, 1)
+        valeur("mem", "Totale", taille(m["mem_total"]), 0, 2)
+        c = cartes["disque"]
+        c["mini"].ajouter(m["disque"])
+        c["grand"].ajouter(m["disque"])
+        c["sous"].setText(f"{m['disque']:.0f} %")
+        valeur("disque", "Temps d'activité", f"{m['disque']:.0f} %", 0, 0)
+        valeur("disque", "Vitesse de lecture", taille(m["lu"], True), 0, 1)
+        valeur("disque", "Vitesse d'écriture", taille(m["ecrit"], True), 0, 2)
+        c = cartes["reseau"]
+        debit = m["rx"] + m["tx"]
+        reseau_max[0] = max(reseau_max[0] * 0.98, debit, 64 * 1024)
+        c["mini"].ajouter(100 * debit / reseau_max[0])
+        c["grand"].ajouter(100 * debit / reseau_max[0])
+        c["sous"].setText(f"↓ {taille(m['rx'], True)}  ↑ {taille(m['tx'], True)}")
+        valeur("reseau", "Réception", taille(m["rx"], True), 0, 0)
+        valeur("reseau", "Envoi", taille(m["tx"], True), 0, 1)
+
+    onglets.addTab(page_perf, QIcon.fromTheme("office-chart-area"), "Performances")
+
+    # ---- Démarrage
+    page_d = QWidget()
+    vd = QVBoxLayout(page_d)
+    expl = QLabel("Programmes lancés automatiquement à l'ouverture de votre session. "
+                  "En désactiver certains peut accélérer le démarrage.")
+    expl.setWordWrap(True)
+    vd.addWidget(expl)
+    arbre_d = QTreeWidget()
+    arbre_d.setHeaderLabels(["Nom", "État"])
+    arbre_d.setRootIsDecorated(False)
+    arbre_d.header().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
+    arbre_d.header().setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
+    vd.addWidget(arbre_d, 1)
+    bd = QHBoxLayout()
+    bd.addStretch(1)
+    bascule = QPushButton("Désactiver")
+    bascule.setEnabled(False)
+    bd.addWidget(bascule)
+    vd.addLayout(bd)
+    onglets.addTab(page_d, QIcon.fromTheme("system-run"), "Applications de démarrage")
+    demarrage = {"liste": []}
+
+    def remplir_demarrage():
+        arbre_d.clear()
+        demarrage["liste"] = entrees_demarrage()
+        for i, e in enumerate(demarrage["liste"]):
+            it = QTreeWidgetItem([e["nom"], "Activé" if e["actif"] else "Désactivé"])
+            it.setIcon(0, QIcon.fromTheme(e["icone"] or "application-x-executable"))
+            it.setData(0, Qt.ItemDataRole.UserRole, i)
+            arbre_d.addTopLevelItem(it)
+        if not demarrage["liste"]:
+            arbre_d.addTopLevelItem(QTreeWidgetItem(["Aucun programme ne se lance au démarrage.", ""]))
+        bascule.setEnabled(False)
+
+    def choix_d():
+        it = arbre_d.currentItem()
+        i = it.data(0, Qt.ItemDataRole.UserRole) if it else None
+        if i is None:
+            bascule.setEnabled(False)
+            return
+        bascule.setEnabled(True)
+        bascule.setText("Désactiver" if demarrage["liste"][i]["actif"] else "Activer")
+
+    def basculer():
+        it = arbre_d.currentItem()
+        i = it.data(0, Qt.ItemDataRole.UserRole) if it else None
+        if i is None:
+            return
+        e = demarrage["liste"][i]
+        try:
+            basculer_demarrage(e, not e["actif"])
+        except OSError as err:
+            QMessageBox.warning(fen, "Gestionnaire des tâches", f"Impossible de modifier ce programme : {err}")
+        remplir_demarrage()
+
+    arbre_d.itemSelectionChanged.connect(choix_d)
+    bascule.clicked.connect(basculer)
+    remplir_demarrage()
+
+    if "--performances" in sys.argv:
+        onglets.setCurrentIndex(1)
+    elif "--demarrage" in sys.argv:
+        onglets.setCurrentIndex(2)
+
+    def tic():
+        if onglets.currentIndex() == 0:
+            remplir()
+        perf()
+
+    remplir()
+    perf()
+    minuteur = QTimer(fen)
+    minuteur.timeout.connect(tic)
+    minuteur.start(INTERVALLE)
+    QTimer.singleShot(400, tic)  # première mesure du processeur dès que possible
+    fen.show()
+    return app.exec()
+
+
+if __name__ == "__main__":
+    sys.exit(main())

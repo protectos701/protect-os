@@ -1,0 +1,237 @@
+#!/usr/bin/python3
+"""« Ce PC » : vos dossiers et les lecteurs de l'ordinateur (Disque local C:, clés USB, DVD…), comme sous Windows."""
+import json
+import os
+import subprocess
+import sys
+
+OR = "#d4a72c"
+TYPE_EFI = "c12a7328-f81f-11d2-ba4b-00a0c93ec93b"
+TYPE_MSR = "e3c9e316-0b5c-4db8-817d-f92df00215ae"
+IGNORES_FS = {"swap", "LVM2_member", "crypto_LUKS", "linux_raid_member", "squashfs", "zfs_member", ""}
+POINTS_SYSTEME = {"/", "/boot", "/boot/efi", "/efi", "/home", "/var", "/usr", "[SWAP]"}
+
+
+def dossier_xdg(cle, defaut):
+    try:
+        sortie = subprocess.run(["xdg-user-dir", cle], capture_output=True, text=True, timeout=3).stdout.strip()
+        if sortie and sortie != os.path.expanduser("~"):
+            return sortie
+    except (OSError, subprocess.SubprocessError):
+        pass
+    return os.path.expanduser(defaut)
+
+
+def dossiers():
+    return [("Bureau", dossier_xdg("DESKTOP", "~/Bureau"), "user-desktop"),
+            ("Documents", dossier_xdg("DOCUMENTS", "~/Documents"), "folder-documents"),
+            ("Téléchargements", dossier_xdg("DOWNLOAD", "~/Téléchargements"), "folder-download"),
+            ("Images", dossier_xdg("PICTURES", "~/Images"), "folder-pictures"),
+            ("Musique", dossier_xdg("MUSIC", "~/Musique"), "folder-music"),
+            ("Vidéos", dossier_xdg("VIDEOS", "~/Vidéos"), "folder-videos")]
+
+
+def espace(point):
+    try:
+        st = os.statvfs(point)
+        return st.f_blocks * st.f_frsize, st.f_bavail * st.f_frsize
+    except OSError:
+        return 0, 0
+
+
+def peripheriques():
+    try:
+        brut = subprocess.run(["lsblk", "-J", "-b", "-o",
+                               "NAME,PATH,LABEL,SIZE,MOUNTPOINT,RM,HOTPLUG,TYPE,FSTYPE,PARTTYPE,TRAN"],
+                              capture_output=True, text=True, timeout=5).stdout
+        arbre = json.loads(brut or "{}").get("blockdevices", [])
+    except (OSError, subprocess.SubprocessError, ValueError):
+        arbre = []
+    sortie = []
+
+    def parcourir(noeuds, disque=None):
+        for n in noeuds:
+            parent = disque or n
+            enfants = n.get("children") or []
+            if n.get("type") in ("disk", "rom", "part", "crypt", "lvm") and not (n.get("type") == "disk" and enfants):
+                sortie.append((n, parent))
+            parcourir(enfants, parent)
+    parcourir(arbre)
+    return sortie
+
+
+def lecteurs():
+    """Liste ordonnée de lecteurs : C: = le système, puis D:, E:… dans l'ordre des disques."""
+    total, libre = espace("/")
+    liste = [{"nom": "Disque local", "lettre": "C:", "point": "/", "total": total, "libre": libre,
+              "icone": "drive-harddisk-root", "chemin": None}]
+    lettre = ord("D")
+    for n, disque in peripheriques():
+        fs = n.get("fstype") or ""
+        point = n.get("mountpoint") or ""
+        ptype = (n.get("parttype") or "").lower()
+        taille = int(n.get("size") or 0)
+        amovible = bool(int(n.get("rm") or 0) or int(n.get("hotplug") or 0)) or disque.get("tran") == "usb"
+        if n.get("type") == "rom":
+            if not fs:
+                continue
+            icone, nom = "media-optical", n.get("label") or "Lecteur DVD"
+        else:
+            if fs in IGNORES_FS or point in POINTS_SYSTEME or ptype in (TYPE_EFI, TYPE_MSR):
+                continue
+            if point.startswith("/run/live") and n.get("type") != "rom":
+                continue
+            if not amovible and not point and taille < 1024 ** 3:
+                continue  # petites partitions techniques
+            if amovible:
+                icone, nom = "drive-removable-media-usb", n.get("label") or "Clé USB"
+            else:
+                icone = "drive-harddisk"
+                nom = n.get("label") or ("Windows" if fs == "ntfs" else "Disque local")
+        t, l = espace(point) if point else (taille, None)
+        liste.append({"nom": nom, "lettre": chr(lettre) + ":", "point": point, "total": t, "libre": l,
+                      "icone": icone, "chemin": n.get("path")})
+        lettre = min(lettre + 1, ord("Z"))
+    return liste
+
+
+def taille_go(o):
+    go = o / 1000 ** 3
+    if go >= 1000:
+        return f"{go / 1000:.1f} To".replace(".", ",")
+    return (f"{go:.0f} Go" if go >= 100 else f"{go:.1f} Go").replace(".", ",")
+
+
+def main():
+    from PyQt6.QtCore import QSize, Qt, QTimer, QUrl
+    from PyQt6.QtGui import QDesktopServices, QFont, QIcon
+    from PyQt6.QtWidgets import (QApplication, QFrame, QGridLayout, QHBoxLayout, QLabel, QMessageBox,
+                                 QProgressBar, QScrollArea, QToolButton, QVBoxLayout, QWidget)
+
+    app = QApplication(sys.argv)
+    app.setApplicationName("protectos-ce-pc")
+    app.setApplicationDisplayName("Ce PC")
+    app.setDesktopFileName("protectos-ce-pc")
+    app.setWindowIcon(QIcon.fromTheme("computer"))
+
+    fen = QWidget()
+    fen.setWindowTitle("Ce PC")
+    fen.resize(860, 560)
+    racine = QVBoxLayout(fen)
+    racine.setContentsMargins(0, 0, 0, 0)
+    zone = QScrollArea()
+    zone.setWidgetResizable(True)
+    zone.setFrameShape(QFrame.Shape.NoFrame)
+    racine.addWidget(zone)
+    contenu = QWidget()
+    zone.setWidget(contenu)
+    v = QVBoxLayout(contenu)
+    v.setContentsMargins(24, 18, 24, 18)
+
+    def titre(texte):
+        l = QLabel(texte)
+        f = QFont(l.font())
+        f.setPointSizeF(f.pointSizeF() * 1.25)
+        f.setBold(True)
+        l.setFont(f)
+        l.setStyleSheet(f"color: {OR}; margin-top: 8px;")
+        return l
+
+    def ouvrir(chemin):
+        QDesktopServices.openUrl(QUrl.fromLocalFile(chemin))
+
+    v.addWidget(titre("Dossiers"))
+    grille_d = QGridLayout()
+    v.addLayout(grille_d)
+    for i, (nom, chemin, icone) in enumerate(dossiers()):
+        b = QToolButton()
+        b.setText(nom)
+        b.setIcon(QIcon.fromTheme(icone, QIcon.fromTheme("folder")))
+        b.setIconSize(QSize(48, 48))
+        b.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
+        b.setAutoRaise(True)
+        b.setMinimumWidth(220)
+        b.clicked.connect(lambda _=False, c=chemin: ouvrir(c))
+        grille_d.addWidget(b, i // 3, i % 3)
+
+    v.addWidget(titre("Périphériques et lecteurs"))
+    hote = QWidget()
+    grille_l = QGridLayout(hote)
+    grille_l.setContentsMargins(0, 0, 0, 0)
+    v.addWidget(hote)
+    v.addStretch(1)
+    etat = {"signature": None}
+
+    def ouvrir_lecteur(l):
+        if l["point"]:
+            ouvrir(l["point"])
+            return
+        r = subprocess.run(["udisksctl", "mount", "-b", l["chemin"]], capture_output=True, text=True)
+        if r.returncode != 0:
+            QMessageBox.warning(fen, "Ce PC", f"Impossible d'ouvrir {l['nom']} ({l['lettre']}).\n\n{r.stderr.strip()}")
+            return
+        actualiser(force=True)
+        for x in lecteurs():
+            if x["chemin"] == l["chemin"] and x["point"]:
+                ouvrir(x["point"])
+
+    def tuile(l):
+        b = QToolButton()
+        b.setAutoRaise(True)
+        b.setMinimumWidth(260)
+        b.setSizePolicy(b.sizePolicy().horizontalPolicy(), b.sizePolicy().verticalPolicy())
+        h = QHBoxLayout(b)
+        h.setContentsMargins(8, 8, 8, 8)
+        ic = QLabel()
+        ic.setPixmap(QIcon.fromTheme(l["icone"], QIcon.fromTheme("drive-harddisk")).pixmap(48, 48))
+        ic.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+        h.addWidget(ic)
+        col = QVBoxLayout()
+        nom = QLabel(f"{l['nom']} ({l['lettre']})")
+        nom.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+        col.addWidget(nom)
+        if l["libre"] is not None and l["total"]:
+            barre = QProgressBar()
+            barre.setTextVisible(False)
+            barre.setFixedHeight(12)
+            pct = round(100 * (l["total"] - l["libre"]) / l["total"])
+            barre.setValue(pct)
+            couleur = "#d9534f" if pct >= 90 else "#2f6fd6"
+            barre.setStyleSheet("QProgressBar { border: 1px solid #6b7a99; border-radius: 2px; background: #e6e9f0; }"
+                                f"QProgressBar::chunk {{ background: {couleur}; }}")
+            barre.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+            col.addWidget(barre)
+            info = QLabel(f"{taille_go(l['libre'])} disponibles sur {taille_go(l['total'])}")
+        else:
+            info = QLabel(f"{taille_go(l['total'])} · cliquez pour ouvrir" if l["total"] else "Cliquez pour ouvrir")
+        info.setEnabled(False)
+        info.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+        col.addWidget(info)
+        h.addLayout(col, 1)
+        b.setMinimumHeight(h.sizeHint().height() + 6)
+        b.clicked.connect(lambda _=False, x=l: ouvrir_lecteur(x))
+        return b
+
+    def actualiser(force=False):
+        liste = lecteurs()
+        signature = [(x["lettre"], x["nom"], x["point"], x["libre"] is None) for x in liste]
+        if signature == etat["signature"] and not force:
+            return
+        etat["signature"] = signature
+        while grille_l.count():
+            w = grille_l.takeAt(0).widget()
+            if w:
+                w.deleteLater()
+        for i, l in enumerate(liste):
+            grille_l.addWidget(tuile(l), i // 3, i % 3)
+
+    actualiser()
+    t = QTimer(fen)
+    t.timeout.connect(actualiser)
+    t.start(3000)
+    fen.show()
+    return app.exec()
+
+
+if __name__ == "__main__":
+    sys.exit(main())

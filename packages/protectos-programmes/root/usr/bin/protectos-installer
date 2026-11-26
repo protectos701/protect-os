@@ -107,6 +107,15 @@ class Installer(QDialog):
             elif not vp.support_32bits():
                 msg += ("\n\nAttention : la partie 32 bits de la compatibilité Windows n'est pas installée. "
                         "Beaucoup de programmes en ont besoin : activez-la dans « Programmes et fonctionnalités ».")
+        if self.kind != "deb" and not self.info.get("editeur"):
+            # Comme le filtre SmartScreen de Windows : on prévient quand l'éditeur est inconnu
+            alerte = QLabel("<b>⚠ Éditeur inconnu</b><br>protect.OS ne peut pas vérifier qui a créé ce programme. "
+                            "Ne continuez que si vous l'avez téléchargé sur le site officiel de son éditeur.")
+            alerte.setWordWrap(True)
+            alerte.setStyleSheet("QLabel { background: #fff4d6; color: #5a4300; border: 1px solid #e0a020;"
+                                 " border-radius: 6px; padding: 10px; }")
+            v.addWidget(alerte)
+            v.addSpacing(8)
         lab = QLabel(msg)
         lab.setWordWrap(True)
         v.addWidget(lab)

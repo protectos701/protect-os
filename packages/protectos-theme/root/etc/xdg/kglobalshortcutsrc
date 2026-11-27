@@ -15,6 +15,7 @@ _launch=Ctrl+Alt+T
 
 [services][org.kde.spectacle.desktop]
 RectangularRegionScreenShot=Meta+Shift+S
+RecordRegion=Meta+Shift+R
 
 [services][protectos-executer.desktop]
 _launch=Meta+R

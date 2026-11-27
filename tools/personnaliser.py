@@ -464,6 +464,8 @@ def appliquer_noms_raccourcis(c):
         v = c["raccourcis"][k]
         if v:
             groupes.setdefault(desktop, []).append(f"{action}={v}")
+    # Windows+R est réservé à « Exécuter » : l'enregistrement d'une zone de l'écran passe sur Windows+Maj+R
+    groupes.setdefault("org.kde.spectacle.desktop", []).append("RecordRegion=Meta+Shift+R")
     # Recherche rapide (Alt+Espace) ; Windows+R ouvre la fenêtre « Exécuter » de protect.OS
     groupes.setdefault("org.kde.krunner.desktop", []).append("_launch=Alt+Space\tAlt+F2")
     # Emojis (Windows+.) comme sous Windows

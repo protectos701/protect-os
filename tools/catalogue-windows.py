@@ -120,6 +120,16 @@ def icone(ident, sites):
     return ""
 
 
+def taille_fichier(url):
+    """Taille du téléchargement (en-tête Content-Length), 0 si le site ne la donne pas."""
+    try:
+        req = urllib.request.Request(url, method="HEAD", headers={"User-Agent": "protectos-catalogue"})
+        with urllib.request.urlopen(req, timeout=20) as r:
+            return int(r.headers.get("Content-Length") or 0)
+    except Exception:
+        return 0
+
+
 def programme(entree):
     ident = entree["id"]
     chemin = "manifests/" + ident[0].lower() + "/" + "/".join(ident.split("."))
@@ -144,7 +154,7 @@ def programme(entree):
             "version": str(version), "categorie": entree["categorie"],
             "description": entree.get("description") or loc.get("ShortDescription", ""),
             "licence": loc.get("License", ""), "site": loc.get("PackageUrl") or loc.get("PublisherUrl", ""),
-            **choix}
+            "taille": taille_fichier(choix["url"]), **choix}
 
 
 def main():

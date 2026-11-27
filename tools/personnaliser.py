@@ -74,7 +74,7 @@ RACCOURCIS = {  # clé de [raccourcis] → (application, action KDE)
     "parametres": ("systemsettings.desktop", "_launch"),
     "terminal": ("org.kde.konsole.desktop", "_launch"),
     "capture_zone": ("org.kde.spectacle.desktop", "RectangularRegionScreenShot"),
-    "executer": ("org.kde.krunner.desktop", "_launch"),
+    "executer": ("protectos-executer.desktop", "_launch"),
     "centre_protection": ("protectos-protection.desktop", "_launch"),
 }
 RACCOURCIS_ORIGINE = {
@@ -462,10 +462,10 @@ def appliquer_noms_raccourcis(c):
     groupes = {}
     for k, (desktop, action) in RACCOURCIS.items():
         v = c["raccourcis"][k]
-        if k == "executer":
-            v = "\t".join(x for x in ("Alt+Space", v) if x)
         if v:
             groupes.setdefault(desktop, []).append(f"{action}={v}")
+    # Recherche rapide (Alt+Espace) ; Windows+R ouvre la fenêtre « Exécuter » de protect.OS
+    groupes.setdefault("org.kde.krunner.desktop", []).append("_launch=Alt+Space\tAlt+F2")
     # Emojis (Windows+.) comme sous Windows
     groupes.setdefault("org.kde.plasma.emojier.desktop", []).append("_launch=Meta+.")
     for desktop, entrees in groupes.items():

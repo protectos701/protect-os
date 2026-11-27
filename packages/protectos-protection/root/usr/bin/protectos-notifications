@@ -1,0 +1,149 @@
+#!/usr/bin/python3
+"""Notifications façon Windows, lancées à l'ouverture de session :
+
+  - « Clé USB branchée : que voulez-vous faire ? » → Ouvrir dans l'explorateur / Ne rien faire
+  - « Disque inséré » pour un CD ou un DVD
+  - « Redémarrez pour terminer les mises à jour » → Redémarrer maintenant / Plus tard (une fois par démarrage)
+"""
+import json
+import os
+import shutil
+import subprocess
+import sys
+import threading
+import time
+
+ETAT = os.path.expanduser("~/.local/share/protectos/notifications.json")
+
+
+def lsblk():
+    try:
+        brut = subprocess.run(["lsblk", "-J", "-b", "-o", "PATH,LABEL,FSTYPE,MOUNTPOINT,RM,HOTPLUG,TRAN,TYPE,SIZE"],
+                              capture_output=True, text=True, timeout=5).stdout
+        return json.loads(brut or "{}").get("blockdevices", [])
+    except (OSError, subprocess.SubprocessError, ValueError):
+        return []
+
+
+def amovibles():
+    """{chemin: (nom affiché, type)} pour les clés USB, cartes mémoire et disques optiques avec des fichiers."""
+    trouves = {}
+
+    def parcourir(noeuds, parent=None):
+        for n in noeuds:
+            p = parent or n
+            usb = p.get("tran") == "usb" or bool(int(p.get("rm") or 0)) or bool(int(p.get("hotplug") or 0))
+            fs = n.get("fstype") or ""
+            if fs and fs not in ("swap", "crypto_LUKS", "LVM2_member") and (usb or n.get("type") == "rom"):
+                if not (n.get("mountpoint") or "").startswith("/run/live"):
+                    trouves[n["path"]] = (n.get("label") or "", "rom" if n.get("type") == "rom" else "usb")
+            parcourir(n.get("children") or [], p)
+    parcourir(lsblk())
+    return trouves
+
+
+def notifier(titre, texte, icone, actions, defaut=None, rappel=None):
+    """Affiche une notification ; rappel(action) est appelé avec l'action choisie."""
+    if not shutil.which("notify-send"):
+        return
+    args = ["notify-send", "-a", "protect.OS", "-i", icone]
+    for cle, libelle in actions:
+        args += ["-A", f"{cle}={libelle}"]
+    args += [titre, texte]
+
+    def attendre():
+        try:
+            r = subprocess.run(args, capture_output=True, text=True, timeout=3600)
+            choix = r.stdout.strip().splitlines()[-1] if r.stdout.strip() else defaut
+        except (OSError, subprocess.SubprocessError, IndexError):
+            choix = defaut
+        if rappel and choix:
+            rappel(choix)
+    threading.Thread(target=attendre, daemon=True).start()
+
+
+def ouvrir_peripherique(chemin):
+    point = ""
+    for _ in range(2):
+        for n in lsblk():
+            for x in [n] + (n.get("children") or []):
+                if x.get("path") == chemin and x.get("mountpoint"):
+                    point = x["mountpoint"]
+        if point:
+            break
+        subprocess.run(["udisksctl", "mount", "-b", chemin], capture_output=True)
+    if point:
+        subprocess.Popen(["xdg-open", point], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+
+def nouveau_peripherique(chemin, nom, type_):
+    if type_ == "rom":
+        titre, texte, icone = "Disque inséré", (f"« {nom} » — " if nom else "") + "Que voulez-vous faire ?", "media-optical"
+    else:
+        titre, texte, icone = "Clé USB branchée", (f"« {nom} » — " if nom else "") + "Que voulez-vous faire ?", \
+            "drive-removable-media-usb"
+    notifier(titre, texte, icone, [("ouvrir", "Ouvrir dans l'explorateur"), ("rien", "Ne rien faire")],
+             rappel=lambda choix: choix == "ouvrir" and ouvrir_peripherique(chemin))
+
+
+def lire_etat():
+    try:
+        with open(ETAT, encoding="utf-8") as f:
+            return json.load(f)
+    except (OSError, ValueError):
+        return {}
+
+
+def ecrire_etat(e):
+    try:
+        os.makedirs(os.path.dirname(ETAT), exist_ok=True)
+        with open(ETAT, "w", encoding="utf-8") as f:
+            json.dump(e, f)
+    except OSError:
+        pass
+
+
+def id_demarrage():
+    try:
+        return open("/proc/sys/kernel/random/boot_id").read().strip()
+    except OSError:
+        return ""
+
+
+def verifier_redemarrage():
+    if not os.path.exists("/run/reboot-required"):
+        return
+    e = lire_etat()
+    if e.get("redemarrage") == id_demarrage():
+        return
+    e["redemarrage"] = id_demarrage()
+    ecrire_etat(e)
+
+    def choix(c):
+        if c == "redemarrer":
+            subprocess.run(["systemctl", "reboot"], capture_output=True)
+    notifier("Redémarrage nécessaire", "Des mises à jour ont été installées. Redémarrez l'ordinateur pour les terminer.",
+             "system-reboot", [("redemarrer", "Redémarrer maintenant"), ("plus-tard", "Plus tard")], rappel=choix)
+
+
+def main():
+    if "--test" in sys.argv:
+        for chemin, (nom, type_) in amovibles().items():
+            print(chemin, nom, type_)
+        return 0
+    connus = set(amovibles())
+    prochain = time.time() + 60
+    while True:
+        time.sleep(2)
+        actuels = amovibles()
+        for chemin in set(actuels) - connus:
+            nom, type_ = actuels[chemin]
+            nouveau_peripherique(chemin, nom, type_)
+        connus = set(actuels)
+        if time.time() >= prochain:
+            verifier_redemarrage()
+            prochain = time.time() + 600
+
+
+if __name__ == "__main__":
+    sys.exit(main())

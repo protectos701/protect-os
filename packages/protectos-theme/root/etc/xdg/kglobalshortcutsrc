@@ -16,11 +16,14 @@ _launch=Ctrl+Alt+T
 [services][org.kde.spectacle.desktop]
 RectangularRegionScreenShot=Meta+Shift+S
 
-[services][org.kde.krunner.desktop]
-_launch=Alt+Space	Meta+R
+[services][protectos-executer.desktop]
+_launch=Meta+R
 
 [services][protectos-protection.desktop]
 _launch=Meta+Shift+P
+
+[services][org.kde.krunner.desktop]
+_launch=Alt+Space	Alt+F2
 
 [services][org.kde.plasma.emojier.desktop]
 _launch=Meta+.

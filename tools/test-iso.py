@@ -184,6 +184,8 @@ def visite(qmp, sortie):
         ("gestionnaire-taches", lambda: touches(qmp, "ctrl", "shift", "esc"), 8, None),
         ("ce-pc", enchainer(lambda: touches(qmp, "meta_l"), 2.5, lambda: taper(qmp, "ce pc"), 2.5,
                             lambda: touches(qmp, "ret")), 8, None),
+        ("parametres-rapides", lambda: clic(qmp, 0.885, 0.965), 4, lambda: touches(qmp, "esc")),
+        ("executer", lambda: touches(qmp, "meta_l", "r"), 4, None),
         ("alt-tab", lambda: touches(qmp, "alt", "tab", tenir=14000), 9, None),
     ]:
         try:

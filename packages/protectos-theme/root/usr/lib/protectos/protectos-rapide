@@ -1,0 +1,186 @@
+#!/usr/bin/python3
+"""Paramètres rapides de protect.OS (panneau en bas à droite, comme Windows 11).
+
+  protectos-rapide                 état en JSON (Wi-Fi, Bluetooth, mode avion, volume, luminosité, batterie…)
+  protectos-rapide wifi on|off
+  protectos-rapide bluetooth on|off
+  protectos-rapide avion on|off
+  protectos-rapide economie on|off
+  protectos-rapide nuit on|off
+  protectos-rapide volume 0-100
+  protectos-rapide muet
+  protectos-rapide luminosite 0-100
+Chaque réglage absent de l'ordinateur (pas de Wi-Fi, pas de batterie…) vaut null.
+"""
+import glob
+import json
+import os
+import re
+import shutil
+import subprocess
+import sys
+
+
+def cmd(*args, timeout=4):
+    if not shutil.which(args[0]):
+        return None
+    try:
+        r = subprocess.run(args, capture_output=True, text=True, timeout=timeout)
+        return r.stdout if r.returncode == 0 else None
+    except (OSError, subprocess.SubprocessError):
+        return None
+
+
+def rfkill(type_):
+    """True = bloqué, False = actif, None = pas de matériel."""
+    etats = []
+    for d in glob.glob("/sys/class/rfkill/rfkill*"):
+        try:
+            if open(os.path.join(d, "type")).read().strip() != type_:
+                continue
+            soft = open(os.path.join(d, "soft")).read().strip() == "1"
+            hard = open(os.path.join(d, "hard")).read().strip() == "1"
+            etats.append(soft or hard)
+        except OSError:
+            continue
+    return all(etats) if etats else None
+
+
+def reseau():
+    sortie = cmd("nmcli", "-t", "-f", "TYPE,STATE,CONNECTION", "device") or ""
+    wifi_present, actif, nom = False, "aucun", ""
+    for ligne in sortie.splitlines():
+        parts = ligne.split(":", 2)
+        if len(parts) < 3:
+            continue
+        type_, etat, connexion = parts
+        if type_ == "wifi":
+            wifi_present = True
+        if etat == "connected" and type_ in ("wifi", "ethernet") and actif == "aucun":
+            actif, nom = type_, connexion
+    radio = (cmd("nmcli", "radio", "wifi") or "").strip()
+    wifi = None
+    if wifi_present or rfkill("wlan") is not None:
+        wifi = radio == "enabled"
+    return wifi, actif, nom
+
+
+def volume():
+    s = cmd("wpctl", "get-volume", "@DEFAULT_AUDIO_SINK@")
+    if s:
+        m = re.search(r"([\d.]+)", s)
+        if m:
+            return round(float(m.group(1)) * 100), "MUTED" in s
+    s = cmd("pactl", "get-sink-volume", "@DEFAULT_SINK@")
+    if s:
+        m = re.search(r"(\d+)%", s)
+        muet = "yes" in (cmd("pactl", "get-sink-mute", "@DEFAULT_SINK@") or "")
+        if m:
+            return int(m.group(1)), muet
+    return None, False
+
+
+LUM = ["gdbus", "call", "--session", "--dest", "org.kde.Solid.PowerManagement",
+       "--object-path", "/org/kde/Solid/PowerManagement/Actions/BrightnessControl",
+       "--method", "org.kde.Solid.PowerManagement.Actions.BrightnessControl."]
+
+
+def luminosite():
+    m = cmd(*LUM[:-1], LUM[-1] + "brightnessMax")
+    v = cmd(*LUM[:-1], LUM[-1] + "brightness")
+    try:
+        maxi = int(re.search(r"(\d+)", m).group(1))
+        val = int(re.search(r"(\d+)", v).group(1))
+        return round(100 * val / maxi) if maxi > 0 else None
+    except (TypeError, AttributeError, ValueError):
+        return None
+
+
+def batterie():
+    for d in sorted(glob.glob("/sys/class/power_supply/*")):
+        try:
+            if open(os.path.join(d, "type")).read().strip() != "Battery":
+                continue
+            if os.path.exists(os.path.join(d, "scope")) and open(os.path.join(d, "scope")).read().strip() == "Device":
+                continue  # souris, manette…
+            pct = int(open(os.path.join(d, "capacity")).read().strip())
+            statut = open(os.path.join(d, "status")).read().strip()
+            return pct, statut in ("Charging", "Full", "Not charging")
+        except (OSError, ValueError):
+            continue
+    return None, False
+
+
+def kwin_config(cle, defaut=""):
+    s = cmd("kreadconfig6", "--file", "kwinrc", "--group", "NightColor", "--key", cle, "--default", defaut)
+    return (s or defaut).strip()
+
+
+def etat():
+    wifi, actif, nom = reseau()
+    bt = rfkill("bluetooth")
+    vol, muet = volume()
+    bat, charge = batterie()
+    profil = (cmd("powerprofilesctl", "get") or "").strip()
+    tout_bloque = [x for x in (rfkill("wlan"), bt) if x is not None]
+    return {
+        "wifi": wifi, "reseau": actif, "reseauNom": nom,
+        "bluetooth": None if bt is None else not bt,
+        "avion": bool(tout_bloque) and all(tout_bloque) and wifi is not True,
+        "economie": None if not profil else profil == "power-saver",
+        "nuit": None if not shutil.which("kreadconfig6") else kwin_config("Active", "false") == "true",
+        "volume": vol, "muet": muet, "luminosite": luminosite(), "batterie": bat, "charge": charge,
+    }
+
+
+def reconfigurer_kwin():
+    cmd("gdbus", "call", "--session", "--dest", "org.kde.KWin", "--object-path", "/KWin",
+        "--method", "org.kde.KWin.reconfigure")
+
+
+def agir(action, valeur):
+    on = valeur in ("on", "1", "true")
+    if action == "wifi":
+        cmd("nmcli", "radio", "wifi", "on" if on else "off")
+    elif action == "bluetooth":
+        cmd("rfkill", "unblock" if on else "block", "bluetooth")
+        if on:
+            cmd("bluetoothctl", "power", "on", timeout=6)
+    elif action == "avion":
+        cmd("rfkill", "block" if on else "unblock", "all")
+        cmd("nmcli", "radio", "all", "off" if on else "on")
+    elif action == "economie":
+        cmd("powerprofilesctl", "set", "power-saver" if on else "balanced")
+    elif action == "nuit":
+        cmd("kwriteconfig6", "--file", "kwinrc", "--group", "NightColor", "--key", "Active", "true" if on else "false")
+        if on:
+            cmd("kwriteconfig6", "--file", "kwinrc", "--group", "NightColor", "--key", "Mode", "Constant")
+            if not kwin_config("NightTemperature"):
+                cmd("kwriteconfig6", "--file", "kwinrc", "--group", "NightColor", "--key", "NightTemperature", "4200")
+        reconfigurer_kwin()
+    elif action == "volume":
+        v = max(0, min(100, int(valeur)))
+        if cmd("wpctl", "set-volume", "@DEFAULT_AUDIO_SINK@", f"{v}%") is None:
+            cmd("pactl", "set-sink-volume", "@DEFAULT_SINK@", f"{v}%")
+        cmd("wpctl", "set-mute", "@DEFAULT_AUDIO_SINK@", "0") or cmd("pactl", "set-sink-mute", "@DEFAULT_SINK@", "0")
+    elif action == "muet":
+        if cmd("wpctl", "set-mute", "@DEFAULT_AUDIO_SINK@", "toggle") is None:
+            cmd("pactl", "set-sink-mute", "@DEFAULT_SINK@", "toggle")
+    elif action == "luminosite":
+        m = cmd(*LUM[:-1], LUM[-1] + "brightnessMax")
+        try:
+            maxi = int(re.search(r"(\d+)", m).group(1))
+            cmd(*LUM[:-1], LUM[-1] + "setBrightness", str(max(1, round(maxi * int(valeur) / 100))))
+        except (TypeError, AttributeError, ValueError):
+            pass
+
+
+def main():
+    if len(sys.argv) >= 2:
+        agir(sys.argv[1], sys.argv[2] if len(sys.argv) > 2 else "")
+    print(json.dumps(etat(), ensure_ascii=False))
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

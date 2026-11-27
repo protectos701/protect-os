@@ -1,0 +1,188 @@
+#!/usr/bin/python3
+"""Fenêtre « Exécuter » (Windows+R), comme sous Windows.
+
+Comprend les commandes Windows habituelles (cmd, notepad, control, taskmgr, msconfig, calc…),
+les dossiers, les fichiers, les adresses Internet et les variables comme %USERPROFILE%.
+"""
+import os
+import re
+import shlex
+import shutil
+import subprocess
+import sys
+
+HISTORIQUE = os.path.expanduser("~/.local/share/protectos/executer-historique")
+
+# Commande Windows → (programmes protect.OS possibles, dans l'ordre de préférence)
+WINDOWS = {
+    "cmd": ["konsole"], "powershell": ["konsole"], "wt": ["konsole"], "terminal": ["konsole"],
+    "notepad": ["kwrite", "kate"], "write": ["kwrite", "kate"], "wordpad": ["libreoffice --writer", "kwrite"],
+    "control": ["protectos-parametres"], "ms-settings:": ["protectos-parametres"], "settings": ["protectos-parametres"],
+    "taskmgr": ["protectos-gestionnaire-taches"], "msconfig": ["protectos-gestionnaire-taches --demarrage"],
+    "perfmon": ["protectos-gestionnaire-taches --performances"], "resmon": ["plasma-systemmonitor"],
+    "explorer": ["dolphin"], "calc": ["kcalc", "gnome-calculator"], "mspaint": ["kolourpaint", "gimp"],
+    "snippingtool": ["spectacle"], "magnify": ["kmag"], "osk": ["onboard"], "charmap": ["kcharselect"],
+    "winver": ["protectos-a-propos"], "msinfo32": ["protectos-a-propos"], "appwiz.cpl": ["protectos-magasin"],
+    "ms-windows-store:": ["protectos-magasin"], "devmgmt.msc": ["kinfocenter"], "diskmgmt.msc": ["partitionmanager"],
+    "cleanmgr": ["protectos-gestionnaire-taches"], "firewall.cpl": ["protectos-protection"],
+    "wf.msc": ["protectos-protection"], "windowsdefender:": ["protectos-protection"],
+    "wuapp": ["protectos-mises-a-jour"], "ms-settings:windowsupdate": ["protectos-mises-a-jour"],
+    "sdclt": ["protectos-sauvegarde"], "ncpa.cpl": ["systemsettings kcm_networkmanagement"],
+    "mmsys.cpl": ["systemsettings kcm_pulseaudio"], "desk.cpl": ["systemsettings kcm_kscreen"],
+    "main.cpl": ["systemsettings kcm_mouse"], "timedate.cpl": ["systemsettings kcm_clock"],
+    "intl.cpl": ["systemsettings kcm_regionandlang"], "powercfg.cpl": ["systemsettings kcm_powerdevilprofilesconfig"],
+    "printers": ["systemsettings kcm_printer_manager"], "this pc": ["protectos-ce-pc"], "ce pc": ["protectos-ce-pc"],
+    "shell:mycomputerfolder": ["protectos-ce-pc"], "regedit": [], "gpedit.msc": [], "services.msc": [],
+}
+DOSSIERS = {
+    "shell:desktop": "DESKTOP", "shell:downloads": "DOWNLOAD", "shell:personal": "DOCUMENTS",
+    "shell:my pictures": "PICTURES", "shell:my music": "MUSIC", "shell:my video": "VIDEOS",
+}
+
+
+def dossier_xdg(cle):
+    try:
+        return subprocess.run(["xdg-user-dir", cle], capture_output=True, text=True, timeout=3).stdout.strip()
+    except (OSError, subprocess.SubprocessError):
+        return os.path.expanduser("~")
+
+
+def variables(texte):
+    """%USERPROFILE%, %APPDATA%, %TEMP%… → chemins de protect.OS."""
+    maison = os.path.expanduser("~")
+    table = {"USERPROFILE": maison, "HOMEPATH": maison, "APPDATA": os.path.join(maison, ".config"),
+             "LOCALAPPDATA": os.path.join(maison, ".local", "share"), "TEMP": "/tmp", "TMP": "/tmp",
+             "USERNAME": os.environ.get("USER", ""), "SYSTEMDRIVE": "/", "WINDIR": "/",
+             "PROGRAMFILES": os.path.join(maison, ".wine", "drive_c", "Program Files")}
+    return re.sub(r"%([A-Za-z_]+)%", lambda m: table.get(m.group(1).upper(), m.group(0)), texte)
+
+
+def interpreter(texte):
+    """Retourne ('ouvrir', chemin_ou_url) / ('lancer', [args]) / ('inconnu', message)."""
+    t = variables(texte.strip())
+    bas = t.lower()
+    if not t:
+        return "inconnu", ""
+    if bas in DOSSIERS:
+        return "ouvrir", dossier_xdg(DOSSIERS[bas])
+    if bas.startswith(("http://", "https://", "www.", "mailto:", "ftp://")):
+        return "ouvrir", t if "://" in t or bas.startswith("mailto:") else "https://" + t
+    if re.match(r"^[a-z]:[\\/]?$", bas):  # C:\ → Ce PC
+        return "lancer", ["protectos-ce-pc"]
+    chemin = os.path.expanduser(t)
+    if os.path.exists(chemin):
+        if chemin.lower().endswith((".exe", ".msi")):
+            return "lancer", ["protectos-installer", chemin]
+        return "ouvrir", chemin
+    mot = bas.split()[0] if bas.split() else bas
+    for cle in (bas, mot, mot.removesuffix(".exe")):
+        if cle in WINDOWS:
+            for cmd in WINDOWS[cle]:
+                args = shlex.split(cmd)
+                if shutil.which(args[0]):
+                    return "lancer", args
+            return "inconnu", (f"« {t} » est un outil propre à Windows. protect.OS le remplace par ses propres "
+                               "Paramètres : ouvrez-les avec Windows+I.")
+    try:
+        args = shlex.split(t)
+    except ValueError:
+        return "inconnu", f"protect.OS ne trouve pas « {t} ». Vérifiez l'orthographe et réessayez."
+    if args and shutil.which(args[0]):
+        return "lancer", args
+    return "inconnu", f"protect.OS ne trouve pas « {t} ». Vérifiez l'orthographe et réessayez."
+
+
+def lire_historique():
+    try:
+        with open(HISTORIQUE, encoding="utf-8") as f:
+            return [l.rstrip("\n") for l in f if l.strip()][:20]
+    except OSError:
+        return []
+
+
+def ecrire_historique(texte, liste):
+    liste = [texte] + [x for x in liste if x != texte]
+    try:
+        os.makedirs(os.path.dirname(HISTORIQUE), exist_ok=True)
+        with open(HISTORIQUE, "w", encoding="utf-8") as f:
+            f.write("\n".join(liste[:20]) + "\n")
+    except OSError:
+        pass
+
+
+def main():
+    from PyQt6.QtCore import QProcess, Qt, QUrl
+    from PyQt6.QtGui import QDesktopServices, QGuiApplication, QIcon
+    from PyQt6.QtWidgets import (QApplication, QComboBox, QDialog, QFileDialog, QGridLayout, QHBoxLayout,
+                                 QLabel, QMessageBox, QPushButton)
+
+    app = QApplication(sys.argv)
+    app.setApplicationName("protectos-executer")
+    app.setApplicationDisplayName("Exécuter")
+    app.setDesktopFileName("protectos-executer")
+    d = QDialog()
+    d.setWindowTitle("Exécuter")
+    d.setWindowIcon(QIcon.fromTheme("system-run"))
+    g = QGridLayout(d)
+    g.setContentsMargins(16, 16, 16, 14)
+    ic = QLabel()
+    ic.setPixmap(QIcon.fromTheme("system-run").pixmap(40, 40))
+    g.addWidget(ic, 0, 0, Qt.AlignmentFlag.AlignTop)
+    expl = QLabel("Entrez le nom d'un programme, dossier, document ou ressource Internet, "
+                  "et protect.OS l'ouvrira pour vous.")
+    expl.setWordWrap(True)
+    g.addWidget(expl, 0, 1, 1, 2)
+    g.addWidget(QLabel("Ouvrir :"), 1, 0)
+    champ = QComboBox()
+    champ.setEditable(True)
+    champ.setMinimumWidth(320)
+    historique = lire_historique()
+    champ.addItems(historique)
+    champ.setCurrentText(historique[0] if historique else "")
+    champ.lineEdit().selectAll()
+    g.addWidget(champ, 1, 1, 1, 2)
+    boutons = QHBoxLayout()
+    boutons.addStretch(1)
+    ok = QPushButton("OK")
+    ok.setDefault(True)
+    annuler = QPushButton("Annuler")
+    parcourir = QPushButton("Parcourir…")
+    for b in (ok, annuler, parcourir):
+        boutons.addWidget(b)
+    g.addLayout(boutons, 2, 0, 1, 3)
+    g.setColumnStretch(1, 1)
+
+    def valider():
+        texte = champ.currentText().strip()
+        if not texte:
+            return
+        action, valeur = interpreter(texte)
+        if action == "inconnu":
+            QMessageBox.warning(d, texte, valeur)
+            champ.lineEdit().selectAll()
+            return
+        ecrire_historique(texte, historique)
+        if action == "ouvrir":
+            url = QUrl(valeur) if "://" in valeur or valeur.startswith("mailto:") else QUrl.fromLocalFile(valeur)
+            QDesktopServices.openUrl(url)
+        else:
+            QProcess.startDetached(valeur[0], valeur[1:], os.path.expanduser("~"))
+        d.accept()
+
+    def choisir():
+        f, _ = QFileDialog.getOpenFileName(d, "Parcourir", os.path.expanduser("~"))
+        if f:
+            champ.setCurrentText(f)
+
+    ok.clicked.connect(valider)
+    annuler.clicked.connect(d.reject)
+    parcourir.clicked.connect(choisir)
+    d.adjustSize()
+    ecran = QGuiApplication.primaryScreen().availableGeometry()
+    d.move(ecran.left() + 12, ecran.bottom() - d.height() - 40)  # en bas à gauche, comme sous Windows
+    d.show()
+    return app.exec()
+
+
+if __name__ == "__main__":
+    sys.exit(main())

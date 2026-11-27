@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Exécuter
+Comment=Ouvrir un programme, un dossier, un document ou un site Internet en tapant son nom
+Exec=protectos-executer
+Icon=system-run
+Terminal=false
+Categories=Qt;System;
+Keywords=exécuter;run;commande;cmd;lancer;

@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Notifications protect.OS
+Comment=Clé USB branchée, redémarrage après les mises à jour
+Exec=protectos-notifications
+Icon=preferences-desktop-notification
+NoDisplay=true
+X-KDE-autostart-after=panel

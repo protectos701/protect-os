@@ -120,6 +120,8 @@ QFrame#carte:hover {{ border-color: {OR}; }}
 QLabel#pastille {{ background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #2a4fb8, stop:1 #0a1a52);
                   border: 2px solid {OR}; border-radius: 22px; color: #f3d27a; font-weight: bold; font-size: 18px; }}
 QLabel#categorie {{ color: {OR}; font-weight: bold; }}
+QPushButton#puce {{ border: 1px solid rgba(212,167,44,0.55); border-radius: 13px; padding: 4px 14px; background: transparent; }}
+QPushButton#puce:checked {{ background: {OR}; color: #0a1a52; font-weight: bold; }}
 QPushButton#installer {{ background: {OR}; color: #1a1405; border: none; border-radius: 6px; padding: 6px 14px;
                         font-weight: bold; }}
 QPushButton#installer:disabled {{ background: rgba(212,167,44,0.35); color: #1a1405; }}
@@ -189,7 +191,11 @@ class CarteWindows(QFrame):
             pastille.setFixedSize(44, 44)
             pastille.setAlignment(Qt.AlignmentFlag.AlignCenter)
         titre = QLabel(f"<b>{prog['nom']}</b>")
-        sous = QLabel(f"{prog.get('editeur', '')} · version {prog['version']}")
+        details = [prog.get("editeur", ""), f"version {prog['version']}"]
+        if prog.get("taille"):
+            details.append(f"{prog['taille'] / 1e6:.0f} Mo".replace(".", ",") if prog["taille"] >= 1e7
+                           else f"{prog['taille'] / 1e6:.1f} Mo".replace(".", ","))
+        sous = QLabel(" · ".join(d for d in details if d))
         sous.setStyleSheet("color: palette(placeholder-text);")
         desc = QLabel(prog.get("description", ""))
         desc.setWordWrap(True)
@@ -332,6 +338,8 @@ class Magasin(QWidget):
         bl.addWidget(self.recherche)
 
         self.onglets = QTabWidget()
+        self.categorie = None
+        self.titres_cat = {}
         self.progs, self.etat = charger_catalogue()
         installes = programmes_windows_installes()
         self.cartes_win = [CarteWindows(p, installes) for p in self.progs]
@@ -358,6 +366,21 @@ class Magasin(QWidget):
         i = QLabel(intro)
         i.setWordWrap(True)
         v.addWidget(i)
+        if champ_cat and cartes:
+            # Filtre par catégorie, comme le Microsoft Store
+            puces = QHBoxLayout()
+            puces.setSpacing(6)
+            self.puces = []
+            for cat in ["Tout"] + sorted({c.prog["categorie"] for c in cartes}):
+                b = QPushButton(cat)
+                b.setObjectName("puce")
+                b.setCheckable(True)
+                b.setChecked(cat == "Tout")
+                b.clicked.connect(lambda _=False, x=cat: self.choisir_categorie(x))
+                puces.addWidget(b)
+                self.puces.append(b)
+            puces.addStretch(1)
+            v.addLayout(puces)
         if not cartes:
             v.addWidget(QLabel("Le catalogue n'est pas disponible pour le moment (connexion à Internet ?)."))
         groupes = {}
@@ -369,6 +392,7 @@ class Magasin(QWidget):
                 lab = QLabel(cat)
                 lab.setObjectName("categorie")
                 v.addWidget(lab)
+                self.titres_cat[cat] = (lab, liste)
             g = QGridLayout()
             g.setSpacing(12)
             for k, c in enumerate(liste):
@@ -383,11 +407,20 @@ class Magasin(QWidget):
         s.setWidget(hote)
         return s
 
+    def choisir_categorie(self, cat):
+        self.categorie = None if cat == "Tout" else cat
+        for b in self.puces:
+            b.setChecked(b.text() == cat)
+        self.filtrer(self.recherche.text())
+
     def filtrer(self, texte):
         t = texte.lower()
         for c in self.cartes_win:
             p = c.prog
-            c.setVisible(not t or t in f"{p['nom']} {p.get('editeur', '')} {p.get('description', '')} {p['categorie']}".lower())
+            texte_ok = not t or t in f"{p['nom']} {p.get('editeur', '')} {p.get('description', '')} {p['categorie']}".lower()
+            c.setVisible(texte_ok and (not self.categorie or p["categorie"] == self.categorie))
+        for cat, (lab, liste) in self.titres_cat.items():
+            lab.setVisible(any(not c.isHidden() for c in liste))
 
 
 def main():

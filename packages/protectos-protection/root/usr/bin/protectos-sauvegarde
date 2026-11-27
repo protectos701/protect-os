@@ -122,8 +122,10 @@ def mode_auto():
     if time.time() - c.get("derniere", 0) < delai - 3600:
         return 0
     if not os.path.ismount(c["destination"]):
-        if time.time() - c.get("derniere", 0) > delai * 3:
+        if time.time() - c.get("derniere", 0) > delai * 3 and time.time() - c.get("rappel", 0) > 86400:
             notifier("Sauvegarde en retard", "Branchez votre disque de sauvegarde pour mettre vos documents à l'abri.")
+            c["rappel"] = time.time()  # un rappel par jour au plus
+            ecrire_conf(c)
         return 0
     ok, msg = sauvegarder(c, journal=lambda _m: None)
     notifier("Documents sauvegardés" if ok else "Sauvegarde impossible", msg)

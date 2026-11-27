@@ -105,6 +105,141 @@
       "id": "Discord.Discord",
       "categorie": "Internet",
       "description": "Discuter par écrit et par la voix avec vos amis et communautés."
+    },
+    {
+      "id": "geeksoftwareGmbH.PDF24Creator",
+      "categorie": "Bureautique",
+      "description": "Créer, fusionner, compresser et convertir des PDF."
+    },
+    {
+      "id": "Foxit.FoxitReader",
+      "categorie": "Bureautique",
+      "description": "Lecteur PDF complet : lire, signer et remplir des formulaires."
+    },
+    {
+      "id": "calibre.calibre",
+      "categorie": "Bureautique",
+      "description": "Bibliothèque de livres numériques et liseuses."
+    },
+    {
+      "id": "TheDocumentFoundation.LibreOffice",
+      "categorie": "Bureautique",
+      "description": "Suite bureautique : traitement de texte, tableur, présentations."
+    },
+    {
+      "id": "voidtools.Everything",
+      "categorie": "Utilitaires",
+      "description": "Retrouver n'importe quel fichier instantanément."
+    },
+    {
+      "id": "AntibodySoftware.WizTree",
+      "categorie": "Utilitaires",
+      "description": "Voir ce qui prend de la place sur le disque."
+    },
+    {
+      "id": "BleachBit.BleachBit",
+      "categorie": "Utilitaires",
+      "description": "Faire le ménage et libérer de l'espace."
+    },
+    {
+      "id": "KeePassXCTeam.KeePassXC",
+      "categorie": "Utilitaires",
+      "description": "Coffre-fort de mots de passe sécurisé."
+    },
+    {
+      "id": "AutoHotkey.AutoHotkey",
+      "categorie": "Utilitaires",
+      "description": "Automatiser les tâches répétitives au clavier."
+    },
+    {
+      "id": "VideoLAN.VLC",
+      "categorie": "Musique et vidéo",
+      "description": "Lit toutes les vidéos et musiques, sans codec à installer."
+    },
+    {
+      "id": "Audacity.Audacity",
+      "categorie": "Musique et vidéo",
+      "description": "Enregistrer et modifier des sons."
+    },
+    {
+      "id": "clsid2.mpc-hc",
+      "categorie": "Musique et vidéo",
+      "description": "Lecteur vidéo léger, façon Windows Media Player classique."
+    },
+    {
+      "id": "Daum.PotPlayer",
+      "categorie": "Musique et vidéo",
+      "description": "Lecteur vidéo très complet."
+    },
+    {
+      "id": "MusicBrainz.Picard",
+      "categorie": "Musique et vidéo",
+      "description": "Ranger et étiqueter sa musique automatiquement."
+    },
+    {
+      "id": "OBSProject.OBSStudio",
+      "categorie": "Musique et vidéo",
+      "description": "Enregistrer l'écran et diffuser en direct."
+    },
+    {
+      "id": "qBittorrent.qBittorrent",
+      "categorie": "Internet",
+      "description": "Télécharger des fichiers torrent."
+    },
+    {
+      "id": "Telegram.TelegramDesktop",
+      "categorie": "Internet",
+      "description": "Messagerie rapide et sécurisée."
+    },
+    {
+      "id": "Zoom.Zoom",
+      "categorie": "Internet",
+      "description": "Visioconférences et réunions en ligne."
+    },
+    {
+      "id": "Mozilla.Thunderbird",
+      "categorie": "Internet",
+      "description": "Lire et envoyer ses e-mails."
+    },
+    {
+      "id": "EpicGames.EpicGamesLauncher",
+      "categorie": "Jeux",
+      "description": "Boutique et jeux Epic Games (jeux gratuits chaque semaine)."
+    },
+    {
+      "id": "GOG.Galaxy",
+      "categorie": "Jeux",
+      "description": "Boutique et bibliothèque de jeux GOG, sans protection anti-copie."
+    },
+    {
+      "id": "ElectronicArts.EADesktop",
+      "categorie": "Jeux",
+      "description": "Application EA pour les jeux Electronic Arts."
+    },
+    {
+      "id": "Ubisoft.Connect",
+      "categorie": "Jeux",
+      "description": "Application Ubisoft pour les jeux Ubisoft."
+    },
+    {
+      "id": "GeoGebra.Classic",
+      "categorie": "Éducation",
+      "description": "Mathématiques : géométrie, graphiques et calcul."
+    },
+    {
+      "id": "Stellarium.Stellarium",
+      "categorie": "Éducation",
+      "description": "Planétarium : le ciel en temps réel."
+    },
+    {
+      "id": "Inkscape.Inkscape",
+      "categorie": "Photo et image",
+      "description": "Dessin vectoriel : logos, affiches, illustrations."
+    },
+    {
+      "id": "GIMP.GIMP",
+      "categorie": "Photo et image",
+      "description": "Retouche photo avancée."
     }
   ]
 }

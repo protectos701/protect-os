@@ -1,0 +1,16 @@
+{
+    "KPackageStructure": "Plasma/Applet",
+    "KPlugin": {
+        "Authors": [{"Name": "protect.OS"}],
+        "Category": "System Information",
+        "Description": "Wi-Fi, Bluetooth, mode avion, volume, luminosité et batterie, comme Windows 11",
+        "EnabledByDefault": true,
+        "FormFactors": ["panel"],
+        "Icon": "preferences-system",
+        "Id": "org.protectos.rapide",
+        "License": "GPL-2.0+",
+        "Name": "Paramètres rapides",
+        "Version": "1.0"
+    },
+    "X-Plasma-API-Minimum-Version": "6.0"
+}

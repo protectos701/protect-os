@@ -40,7 +40,22 @@ tasks.writeConfig("launchers", [
 // Espace extensible à droite
 panel.addWidget("org.kde.plasma.panelspacer");
 
-panel.addWidget("org.kde.plasma.systemtray");
+var zoneNotif = panel.addWidget("org.kde.plasma.systemtray");
+// Les icônes réseau, son, batterie, Bluetooth et luminosité sont regroupées dans les Paramètres rapides
+// (comme Windows 11) : dans la zone de notification, elles passent sous la petite flèche.
+try {
+    var idZone = zoneNotif.readConfig("SystrayContainmentId");
+    var zone = idZone ? desktopById(idZone) : null;
+    if (zone) {
+        zone.currentConfigGroup = ["General"];
+        zone.writeConfig("hiddenItems", ["org.kde.plasma.networkmanagement", "org.kde.plasma.volume",
+            "org.kde.plasma.battery", "org.kde.plasma.bluetooth", "org.kde.plasma.brightness",
+            "org.kde.plasma.notifications", "org.kde.plasma.devicenotifier", "org.kde.plasma.clipboard",
+            "org.kde.kscreen", "org.kde.plasma.keyboardlayout", "org.kde.plasma.manage-inputmethod"]);
+    }
+} catch (e) { print("Zone de notification : " + e); }
+// Paramètres rapides : Wi-Fi, Bluetooth, mode avion, volume, luminosité, batterie
+panel.addWidget("org.protectos.rapide");
 // Horloge protect.OS : au clic, météo animée, calendrier et notifications
 panel.addWidget("org.protectos.horloge");
 panel.addWidget("org.kde.plasma.showdesktop");

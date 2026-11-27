@@ -199,7 +199,8 @@
     {
       "id": "Mozilla.Thunderbird",
       "categorie": "Internet",
-      "description": "Lire et envoyer ses e-mails."
+      "description": "Lire et envoyer ses e-mails.",
+      "nom": "Mozilla Thunderbird"
     },
     {
       "id": "EpicGames.EpicGamesLauncher",

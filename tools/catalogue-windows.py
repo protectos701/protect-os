@@ -149,7 +149,7 @@ def programme(entree):
     if not choix:
         raise ValueError("aucun installateur compatible (seulement msix/zip ?)")
     ic = icone(ident, [loc.get("PackageUrl"), loc.get("PublisherUrl")])
-    return {"id": ident, "nom": loc.get("PackageName", ident.split(".")[-1]), "editeur": loc.get("Publisher", ""),
+    return {"id": ident, "nom": entree.get("nom") or loc.get("PackageName", ident.split(".")[-1]), "editeur": loc.get("Publisher", ""),
             "icone": ic,
             "version": str(version), "categorie": entree["categorie"],
             "description": entree.get("description") or loc.get("ShortDescription", ""),

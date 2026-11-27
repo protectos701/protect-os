@@ -148,7 +148,9 @@ def programme(entree):
     choix = choisir_installateur(inst)
     if not choix:
         raise ValueError("aucun installateur compatible (seulement msix/zip ?)")
-    ic = icone(ident, [loc.get("PackageUrl"), loc.get("PublisherUrl")])
+    # Une page GitHub donnerait le logo de GitHub, pas celui du programme
+    sites = [u for u in (loc.get("PackageUrl"), loc.get("PublisherUrl")) if u and "github.com" not in u]
+    ic = icone(ident, sites)
     return {"id": ident, "nom": entree.get("nom") or loc.get("PackageName", ident.split(".")[-1]), "editeur": loc.get("Publisher", ""),
             "icone": ic,
             "version": str(version), "categorie": entree["categorie"],

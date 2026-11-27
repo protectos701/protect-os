@@ -430,7 +430,7 @@
    "id": "clsid2.mpc-hc",
    "nom": "MPC-HC",
    "editeur": "MPC-HC Team",
-   "icone": "clsid2.mpc-hc.png",
+   "icone": "",
    "version": "2.8.5",
    "categorie": "Musique et vidéo",
    "description": "Lecteur vidéo léger, façon Windows Media Player classique.",

@@ -15,11 +15,11 @@ name=protectos
 cursorTheme=ProtectOS-curseurs
 
 [kwinrc][org.kde.kdecoration2]
-library=org.kde.breeze
-theme=Breeze
+library=org.kde.kwin.aurorae
+theme=__aurorae__svg__protectos
 
 [kwinrc][WindowSwitcher]
-LayoutName=org.kde.breeze.desktop
+LayoutName=thumbnail_grid
 
 [KSplash]
 Theme=org.protectos.desktop

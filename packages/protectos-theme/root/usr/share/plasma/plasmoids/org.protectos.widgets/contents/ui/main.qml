@@ -102,7 +102,9 @@ PlasmoidItem {
     function decoder(t) {
         return t.replace(/<!\[CDATA\[|\]\]>/g, "").replace(/&amp;/g, "&").replace(/&quot;/g, "\"")
                 .replace(/&#039;|&#39;|&apos;/g, "'").replace(/&lt;/g, "<").replace(/&gt;/g, ">")
-                .replace(/&#8217;/g, "’").replace(/&nbsp;/g, " ").trim()
+                .replace(/&nbsp;/g, " ")
+                .replace(/&#x([0-9a-fA-F]+);/g, function (m, h) { return String.fromCharCode(parseInt(h, 16)) })
+                .replace(/&#(\d+);/g, function (m, d) { return String.fromCharCode(parseInt(d, 10)) }).trim()
     }
     function actualiserTitres() {
         var flux = Plasmoid.configuration.actualites
@@ -222,6 +224,15 @@ PlasmoidItem {
                             anchors.fill: parent
                             condition: racine.meteo ? racine.conditionDe(racine.meteo.code) : "soleil"
                             jour: racine.meteo ? racine.meteo.jour : true
+                        }
+                        Rectangle {  // voile sombre pour que le texte reste lisible devant les nuages
+                            anchors { left: parent.left; right: parent.right; bottom: parent.bottom }
+                            height: parent.height * 0.5
+                            radius: 14
+                            gradient: Gradient {
+                                GradientStop { position: 0; color: Qt.rgba(0.02, 0.06, 0.2, 0) }
+                                GradientStop { position: 1; color: Qt.rgba(0.02, 0.06, 0.2, 0.65) }
+                            }
                         }
                         Column {
                             anchors { left: parent.left; bottom: parent.bottom; margins: Kirigami.Units.largeSpacing }

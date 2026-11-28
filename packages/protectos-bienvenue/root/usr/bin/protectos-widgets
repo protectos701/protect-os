@@ -25,10 +25,12 @@ def identifiant():
 def main():
     n = identifiant()
     if not n:
+        print("protectos-widgets : gadget introuvable dans", FICHIER, file=sys.stderr)
         return 1
-    subprocess.run(["gdbus", "call", "--session", "--dest", "org.kde.kglobalaccel", "--object-path",
+    r = subprocess.run(["gdbus", "call", "--session", "--dest", "org.kde.kglobalaccel", "--object-path",
                     "/component/plasmashell", "--method", "org.kde.kglobalaccel.Component.invokeShortcut",
-                    f"activate widget {n}"], capture_output=True)
+                    f"activate widget {n}"], capture_output=True, text=True)
+    print(f"protectos-widgets : widget {n} → {r.returncode} {r.stderr.strip()}", file=sys.stderr)
     return 0
 
 

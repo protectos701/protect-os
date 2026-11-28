@@ -300,7 +300,8 @@ def main():
     try:
         lignes = open(serial, encoding="utf-8", errors="replace").read().splitlines()
         motif = re.compile(r"systemmonitor|ksysguard|ksystemstats|sensorface|protectos\.moniteur|"
-                           r"plasmashell.*(error|Error|not installed|failed|Cannot)", re.I)
+                           r"plasmashell.*(error|Error|not installed|failed|Cannot)|aurorae|kdecoration|protectos-widgets|"
+                           r"kwin_wayland.*(warning|error|theme)", re.I)
         utiles = [l[-220:] for l in lignes if motif.search(l)]
         if utiles:
             print("----- Journal de Plasma (extraits) -----")

@@ -219,7 +219,7 @@ def main():
                     f"X-KDE-PluginInfo-Name={dossier}\nX-KDE-PluginInfo-Author=protect.OS\n"
                     "X-KDE-PluginInfo-Version=1.0\nX-KDE-PluginInfo-License=GPL\n")
         with open(os.path.join(d, "metadata.json"), "w") as f:
-            json.dump({"KPlugin": {"Id": dossier, "Name": v["nom"], "Description": "Fenêtres protect.OS",
+            json.dump({"KPackageStructure": "KWin/Aurorae", "KPlugin": {"Id": dossier, "Name": v["nom"], "Description": "Fenêtres protect.OS",
                                    "Authors": [{"Name": "protect.OS"}], "License": "GPL", "Version": "1.0"}},
                       f, ensure_ascii=False, indent=2)
         print("Décoration", dossier)

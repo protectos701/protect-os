@@ -469,6 +469,7 @@ def appliquer_noms_raccourcis(c):
     groupes.setdefault("org.kde.spectacle.desktop", []).append("RecordRegion=Meta+Shift+R")
     # Bureaux virtuels comme sous Windows : Windows+Ctrl+D en crée un, Windows+Ctrl+F4 le ferme
     groupes.setdefault("protectos-bureaux.desktop", []).extend(["Nouveau=Meta+Ctrl+D", "Fermer=Meta+Ctrl+F4"])
+    groupes.setdefault("protectos-widgets.desktop", []).append("_launch=Meta+W")
     # Recherche rapide (Alt+Espace) ; Windows+R ouvre la fenêtre « Exécuter » de protect.OS
     groupes.setdefault("org.kde.krunner.desktop", []).append("_launch=Alt+Space\tAlt+F2")
     # Emojis (Windows+.) comme sous Windows

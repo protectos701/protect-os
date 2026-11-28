@@ -1,0 +1,19 @@
+# Vérifications ponctuelles dans un Debian 13 propre (paquets disponibles, fichiers de référence KDE…)
+name: Enquête Debian
+on:
+  workflow_dispatch:
+    inputs:
+      script:
+        description: Commandes à exécuter (bash)
+        required: true
+jobs:
+  enquete:
+    runs-on: ubuntu-latest
+    container: debian:trixie
+    steps:
+      - name: Préparer
+        run: apt-get update -qq && apt-get install -y -qq curl ca-certificates >/dev/null
+      - name: Exécuter
+        env:
+          SCRIPT: ${{ inputs.script }}
+        run: bash -c "$SCRIPT"

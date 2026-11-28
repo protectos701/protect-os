@@ -1,7 +1,0 @@
-[Desktop Entry]
-Type=Application
-Name=Widgets
-Comment=Météo, actualités et état de l'ordinateur
-Exec=protectos-widgets
-Icon=weather-few-clouds
-NoDisplay=true

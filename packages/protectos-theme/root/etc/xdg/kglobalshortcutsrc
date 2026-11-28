@@ -27,9 +27,6 @@ _launch=Meta+Shift+P
 Nouveau=Meta+Ctrl+D
 Fermer=Meta+Ctrl+F4
 
-[services][protectos-widgets.desktop]
-_launch=Meta+W
-
 [services][org.kde.krunner.desktop]
 _launch=Alt+Space	Alt+F2
 

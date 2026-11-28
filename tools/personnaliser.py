@@ -490,6 +490,13 @@ def appliquer_noms_raccourcis(c):
             "show-on-mouse-pos=Meta+V,Meta+V,Afficher le presse-papiers à la position de la souris"]
     with open(os.path.join(THEME, "etc", "xdg", "kglobalshortcutsrc"), "w", encoding="utf-8") as f:
         f.write("\n".join(out) + "\n")
+    # Les raccourcis de KWin et de Plasma ne sont lus que dans le fichier de l'utilisateur :
+    # chaque nouveau compte reçoit donc sa copie (le reste passe par les raccourcis d'applications).
+    i = out.index("[kwin]")
+    skel = os.path.join(THEME, "etc", "skel", ".config")
+    os.makedirs(skel, exist_ok=True)
+    with open(os.path.join(skel, "kglobalshortcutsrc"), "w", encoding="utf-8") as f:
+        f.write("\n".join(out[i:]) + "\n")
 
 
 def appliquer_protection(c):

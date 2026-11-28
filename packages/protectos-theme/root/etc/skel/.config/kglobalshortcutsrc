@@ -1,0 +1,11 @@
+[kwin]
+Window Maximize=Meta+Up	Meta+PgUp,Meta+PgUp,Agrandir la fenêtre
+Window Minimize=Meta+Down	Meta+PgDown,Meta+PgDown,Réduire la fenêtre
+Window Quick Tile Top=none,Meta+Up,Mosaïque en haut
+Window Quick Tile Bottom=none,Meta+Down,Mosaïque en bas
+Overview=Meta+Tab,Meta+W,Vue d'ensemble
+
+[plasmashell]
+next activity=none,Meta+Tab,Activité suivante
+previous activity=none,Meta+Shift+Tab,Activité précédente
+show-on-mouse-pos=Meta+V,Meta+V,Afficher le presse-papiers à la position de la souris

@@ -7,6 +7,9 @@ panel.height = 2 * Math.floor(gridUnit * 2.9 / 2);
 panel.floating = true;
 
 // Espace extensible à gauche : pousse le menu et les icônes vers le centre (barre centrée)
+// Widgets (Windows+W) : la météo à gauche de la barre des tâches, comme Windows 11
+var widgets = panel.addWidget("org.protectos.widgets");
+try { widgets.globalShortcut = "Meta+W"; } catch (e) { print("Widgets : " + e); }
 panel.addWidget("org.kde.plasma.panelspacer"); // barre-centree
 
 // Menu Démarrer avec le logo protect.OS

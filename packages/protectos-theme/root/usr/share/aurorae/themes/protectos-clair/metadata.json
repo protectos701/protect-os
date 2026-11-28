@@ -1,0 +1,14 @@
+{
+  "KPlugin": {
+    "Id": "protectos-clair",
+    "Name": "protect.OS (clair)",
+    "Description": "Fenêtres protect.OS",
+    "Authors": [
+      {
+        "Name": "protect.OS"
+      }
+    ],
+    "License": "GPL",
+    "Version": "1.0"
+  }
+}

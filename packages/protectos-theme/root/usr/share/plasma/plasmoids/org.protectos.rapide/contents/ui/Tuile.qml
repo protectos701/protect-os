@@ -36,7 +36,7 @@ Item {
             width: Kirigami.Units.iconSizes.smallMedium
             height: width
             source: tuile.icone
-            color: tuile.actif ? "#0a1a52" : Kirigami.Theme.textColor
+            color: tuile.actif ? "#0a1a52" : "#eef2fb"
             isMask: true
         }
         MouseArea {
@@ -63,7 +63,7 @@ Item {
             width: Kirigami.Units.iconSizes.small
             height: width
             source: "go-next"
-            color: tuile.actif ? "#0a1a52" : Kirigami.Theme.textColor
+            color: tuile.actif ? "#0a1a52" : "#eef2fb"
             isMask: true
             MouseArea {
                 anchors.fill: parent

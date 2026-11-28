@@ -23,6 +23,10 @@ _launch=Meta+R
 [services][protectos-protection.desktop]
 _launch=Meta+Shift+P
 
+[services][protectos-bureaux.desktop]
+Nouveau=Meta+Ctrl+D
+Fermer=Meta+Ctrl+F4
+
 [services][org.kde.krunner.desktop]
 _launch=Alt+Space	Alt+F2
 
@@ -34,7 +38,7 @@ Window Maximize=Meta+Up	Meta+PgUp,Meta+PgUp,Agrandir la fenêtre
 Window Minimize=Meta+Down	Meta+PgDown,Meta+PgDown,Réduire la fenêtre
 Window Quick Tile Top=none,Meta+Up,Mosaïque en haut
 Window Quick Tile Bottom=none,Meta+Down,Mosaïque en bas
-Overview=Meta+Tab	Meta+W,Meta+W,Vue d'ensemble
+Overview=Meta+Tab,Meta+W,Vue d'ensemble
 
 [plasmashell]
 next activity=none,Meta+Tab,Activité suivante

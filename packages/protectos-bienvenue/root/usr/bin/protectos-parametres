@@ -32,8 +32,8 @@ TUILES = [
      "bluetooth appareil casque"),
     ("Personnalisation", "Fond d'écran", "Choisir l'image du bureau", "preferences-desktop-wallpaper", "fond",
      "fond écran image bureau wallpaper"),
-    ("Personnalisation", "Thème", "Sombre ou clair", "preferences-desktop-theme", "theme",
-     "thème sombre clair couleur apparence"),
+    ("Personnalisation", "Couleurs", "Mode sombre ou clair, couleur d'accentuation", "preferences-desktop-theme",
+     "theme", "thème sombre clair couleur accentuation accent apparence mode"),
     ("Personnalisation", "Polices", "Taille et style du texte", "preferences-desktop-font", "kcm:kcm_fonts",
      "police texte taille écriture"),
     ("Comptes", "Comptes", "Utilisateurs, mots de passe, photo", "system-users", "kcm:kcm_users",
@@ -112,8 +112,21 @@ def fonds():
     return out
 
 
+ACCENTS = [("Or", "#d4a72c"), ("Bleu", "#2f6fd6"), ("Turquoise", "#1fa3a3"), ("Vert", "#2fa86b"),
+           ("Orange", "#e07a1f"), ("Rouge", "#d9534f"), ("Rose", "#d6498f"), ("Violet", "#8e5bd6")]
+
+
+def appliquer_accent(couleur):
+    subprocess.run(["plasma-apply-colorscheme", "--accent-color", couleur], capture_output=True)
+
+
 def appliquer_theme(clair):
     subprocess.run(["plasma-apply-colorscheme", "ProtectBleuOr" + ("Clair" if clair else "")], capture_output=True)
+    # Barres de titre assorties
+    subprocess.run(["kwriteconfig6", "--file", "kwinrc", "--group", "org.kde.kdecoration2", "--key", "theme",
+                    "__aurorae__svg__protectos" + ("-clair" if clair else "")], capture_output=True)
+    subprocess.run(["gdbus", "call", "--session", "--dest", "org.kde.KWin", "--object-path", "/KWin",
+                    "--method", "org.kde.KWin.reconfigure"], capture_output=True)
     for outil in glob.glob("/usr/lib/*/libexec/plasma-changeicons") + glob.glob("/usr/libexec/plasma-changeicons"):
         subprocess.run([outil, "ProtectOS" + ("-Clair" if clair else "")], capture_output=True)
         break
@@ -188,6 +201,19 @@ class Theme(QDialog):
             b.clicked.connect(lambda _c=False, c=clair: (appliquer_theme(c), self.message.setText("Thème appliqué.")))
             row.addWidget(b)
         lay.addLayout(row)
+        lay.addSpacing(12)
+        lay.addWidget(QLabel("<b>Couleur d'accentuation</b> — sélections, boutons et éléments actifs."))
+        accents = QHBoxLayout()
+        for nom, c in ACCENTS:
+            b = QPushButton()
+            b.setToolTip(nom)
+            b.setFixedSize(44, 44)
+            b.setStyleSheet(f"background:{c}; border:2px solid rgba(255,255,255,0.5); border-radius:22px;")
+            b.clicked.connect(lambda _c=False, x=c, n=nom: (appliquer_accent(x),
+                                                            self.message.setText(f"Couleur « {n} » appliquée.")))
+            accents.addWidget(b)
+        accents.addStretch(1)
+        lay.addLayout(accents)
         self.message = QLabel("")
         lay.addWidget(self.message)
 

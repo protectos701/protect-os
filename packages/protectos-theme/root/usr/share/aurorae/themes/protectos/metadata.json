@@ -1,0 +1,14 @@
+{
+  "KPlugin": {
+    "Id": "protectos",
+    "Name": "protect.OS",
+    "Description": "Fenêtres protect.OS",
+    "Authors": [
+      {
+        "Name": "protect.OS"
+      }
+    ],
+    "License": "GPL",
+    "Version": "1.0"
+  }
+}

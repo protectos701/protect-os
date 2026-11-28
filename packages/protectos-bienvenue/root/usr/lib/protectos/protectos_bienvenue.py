@@ -9,7 +9,7 @@ CONFIG = os.path.join(os.environ.get("XDG_CONFIG_HOME", os.path.join(HOME, ".con
 DONE_FLAG = os.path.join(CONFIG, "bienvenue-fait")
 ROOT_HELPER = "/usr/lib/protectos/protectos-bienvenue-root"
 
-SCHEMES = {"sombre": ("ProtectBleuOr", "breeze-dark"), "clair": ("ProtectBleuOrClair", "breeze")}
+SCHEMES = {"sombre": ("ProtectBleuOr", "ProtectOS"), "clair": ("ProtectBleuOrClair", "ProtectOS-Clair")}
 
 # Applications proposées : (paquets Debian, nom, description, icône).
 # La liste des paquets autorisés est répétée dans protectos-bienvenue-root (sécurité).
@@ -122,6 +122,11 @@ def apply_scheme(mode):
         if path:
             subprocess.run([path, icons], capture_output=True)
             break
+    # Barres de titre assorties
+    subprocess.run(["kwriteconfig6", "--file", "kwinrc", "--group", "org.kde.kdecoration2", "--key", "theme",
+                    "__aurorae__svg__protectos" + ("-clair" if mode == "clair" else "")], capture_output=True)
+    subprocess.run(["gdbus", "call", "--session", "--dest", "org.kde.KWin", "--object-path", "/KWin",
+                    "--method", "org.kde.KWin.reconfigure"], capture_output=True)
 
 
 def current_scheme():

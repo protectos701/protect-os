@@ -1,0 +1,56 @@
+#!/usr/bin/python3
+"""Bureaux virtuels façon Windows :
+  protectos-bureaux nouveau   (Windows+Ctrl+D)  crée un bureau et s'y rend
+  protectos-bureaux fermer    (Windows+Ctrl+F4) ferme le bureau actuel (ses fenêtres passent sur un autre)
+"""
+import re
+import subprocess
+import sys
+
+BASE = ["gdbus", "call", "--session", "--dest", "org.kde.KWin", "--object-path", "/VirtualDesktopManager"]
+IFACE = "org.kde.KWin.VirtualDesktopManager"
+
+
+def appel(*args):
+    try:
+        r = subprocess.run(BASE + list(args), capture_output=True, text=True, timeout=5)
+        return r.stdout if r.returncode == 0 else ""
+    except (OSError, subprocess.SubprocessError):
+        return ""
+
+
+def propriete(nom):
+    return appel("--method", "org.freedesktop.DBus.Properties.Get", IFACE, nom)
+
+
+def bureaux():
+    """[(position, id, nom)] dans l'ordre."""
+    return sorted((int(p), i, n) for p, i, n in re.findall(r"\(uint32 (\d+), '([^']*)', '([^']*)'\)", propriete("desktops")))
+
+
+def aller(ident):
+    appel("--method", "org.freedesktop.DBus.Properties.Set", IFACE, "current", f"<'{ident}'>")
+
+
+def main():
+    action = sys.argv[1] if len(sys.argv) > 1 else "nouveau"
+    liste = bureaux()
+    if action == "nouveau":
+        avant = {i for _, i, _ in liste}
+        appel("--method", IFACE + ".createDesktop", str(len(liste)), f"Bureau {len(liste) + 1}")
+        for _, i, _ in bureaux():
+            if i not in avant:
+                aller(i)
+    elif action == "fermer" and len(liste) > 1:
+        actuel = re.search(r"'([^']*)'", propriete("current"))
+        if actuel:
+            ident = actuel.group(1)
+            autres = [i for _, i, _ in liste if i != ident]
+            position = [i for _, i, _ in liste].index(ident)
+            aller(autres[max(0, position - 1)])
+            appel("--method", IFACE + ".removeDesktop", ident)
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

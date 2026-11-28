@@ -1,0 +1,16 @@
+[Desktop Entry]
+Type=Application
+Name=Bureaux virtuels
+Comment=Créer ou fermer un bureau virtuel
+Exec=protectos-bureaux nouveau
+Icon=preferences-desktop-virtual
+NoDisplay=true
+Actions=Nouveau;Fermer;
+
+[Desktop Action Nouveau]
+Name=Nouveau bureau
+Exec=protectos-bureaux nouveau
+
+[Desktop Action Fermer]
+Name=Fermer le bureau
+Exec=protectos-bureaux fermer

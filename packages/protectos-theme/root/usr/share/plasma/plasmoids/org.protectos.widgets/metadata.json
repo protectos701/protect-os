@@ -1,0 +1,15 @@
+{
+    "KPlugin": {
+        "Authors": [{"Name": "protect.OS"}],
+        "Category": "Date and Time",
+        "Description": "Météo, actualités, raccourcis et état de l'ordinateur (Windows+W), comme les widgets de Windows 11",
+        "EnabledByDefault": true,
+        "FormFactors": ["panel"],
+        "Icon": "weather-few-clouds",
+        "Id": "org.protectos.widgets",
+        "License": "GPL-2.0+",
+        "Name": "Widgets",
+        "Version": "1.0"
+    },
+    "X-Plasma-API-Minimum-Version": "6.0"
+}

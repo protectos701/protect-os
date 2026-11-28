@@ -349,11 +349,12 @@ def appliquer_logiciels(c):
 
 def appliquer_meteo(c):
     """Ville de la météo de l'horloge (valeur par défaut du gadget)."""
-    xml = os.path.join(THEME, "usr", "share", "plasma", "plasmoids", "org.protectos.horloge", "contents", "config", "main.xml")
-    if os.path.exists(xml):
-        from xml.sax.saxutils import escape
-        _remplacer(xml, r'(<entry name="ville" type="String"><default>)[^<]*(</default>)',
-                   lambda m: m.group(1) + escape(c["meteo"]["ville"]) + m.group(2))
+    from xml.sax.saxutils import escape
+    for gadget in ("org.protectos.horloge", "org.protectos.widgets"):
+        xml = os.path.join(THEME, "usr", "share", "plasma", "plasmoids", gadget, "contents", "config", "main.xml")
+        if os.path.exists(xml):
+            _remplacer(xml, r'(<entry name="ville" type="String"><default>)[^<]*(</default>)',
+                       lambda m: m.group(1) + escape(c["meteo"]["ville"]) + m.group(2))
 
 
 def appliquer_langue(c):
@@ -466,6 +467,8 @@ def appliquer_noms_raccourcis(c):
             groupes.setdefault(desktop, []).append(f"{action}={v}")
     # Windows+R est réservé à « Exécuter » : l'enregistrement d'une zone de l'écran passe sur Windows+Maj+R
     groupes.setdefault("org.kde.spectacle.desktop", []).append("RecordRegion=Meta+Shift+R")
+    # Bureaux virtuels comme sous Windows : Windows+Ctrl+D en crée un, Windows+Ctrl+F4 le ferme
+    groupes.setdefault("protectos-bureaux.desktop", []).extend(["Nouveau=Meta+Ctrl+D", "Fermer=Meta+Ctrl+F4"])
     # Recherche rapide (Alt+Espace) ; Windows+R ouvre la fenêtre « Exécuter » de protect.OS
     groupes.setdefault("org.kde.krunner.desktop", []).append("_launch=Alt+Space\tAlt+F2")
     # Emojis (Windows+.) comme sous Windows
@@ -479,7 +482,7 @@ def appliquer_noms_raccourcis(c):
             "Window Minimize=Meta+Down\tMeta+PgDown,Meta+PgDown,Réduire la fenêtre",
             "Window Quick Tile Top=none,Meta+Up,Mosaïque en haut",
             "Window Quick Tile Bottom=none,Meta+Down,Mosaïque en bas",
-            "Overview=Meta+Tab\tMeta+W,Meta+W,Vue d'ensemble",
+            "Overview=Meta+Tab,Meta+W,Vue d'ensemble",  # Windows+W ouvre les widgets
             "", "[plasmashell]",
             "next activity=none,Meta+Tab,Activité suivante",
             "previous activity=none,Meta+Shift+Tab,Activité précédente",

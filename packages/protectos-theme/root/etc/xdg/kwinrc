@@ -1,8 +1,10 @@
+# Fenêtres façon Windows 11 : coins arrondis, ombre douce, boutons « — ☐ ✕ » (croix rouge au survol)
 [org.kde.kdecoration2]
-library=org.kde.breeze
-theme=Breeze
+library=org.kde.kwin.aurorae
+theme=__aurorae__svg__protectos
 ButtonsOnLeft=M
 ButtonsOnRight=IAX
+BorderSize=Normal
 
 # Verre, et animations : la fenêtre réduite glisse vers la barre des tâches
 [Plugins]

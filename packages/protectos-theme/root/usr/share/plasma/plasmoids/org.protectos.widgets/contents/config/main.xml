@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<kcfg xmlns="http://www.kde.org/standards/kcfg/1.0"
+      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xsi:schemaLocation="http://www.kde.org/standards/kcfg/1.0 http://www.kde.org/standards/kcfg/1.0/kcfg.xsd">
+  <kcfgfile name=""/>
+  <group name="General">
+    <!-- Ville de la météo : réglée par ma-personnalisation.conf, section [meteo] -->
+    <entry name="ville" type="String"><default>Paris</default></entry>
+    <!-- Pour les tests : force une condition (soleil, nuageux, pluie…), vide = météo réelle -->
+    <entry name="simulation" type="String"><default></default></entry>
+    <!-- Actualités : flux RSS affiché dans les widgets (vide = pas d'actualités) -->
+    <entry name="actualites" type="String"><default>https://www.francetvinfo.fr/titres.rss</default></entry>
+  </group>
+</kcfg>
